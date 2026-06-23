@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.vanniktech.maven.publish)
     alias(libs.plugins.detekt)
+    alias(libs.plugins.ktlint)
 }
 
 version = "1.1.0"
