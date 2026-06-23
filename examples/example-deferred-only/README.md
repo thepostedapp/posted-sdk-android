@@ -1,16 +1,16 @@
-# Detour Android SDK — Deferred-Only Example
+# posted-sdk for Android — Deferred-Only Example
 
-This example demonstrates `LinkProcessingMode.DEFERRED_ONLY` — the integration pattern for apps where a navigation framework (Jetpack Navigation, etc.) already handles Universal Links and custom scheme links, and Detour is only needed for deferred deep link resolution on first install.
+This example demonstrates `LinkProcessingMode.DEFERRED_ONLY` — the integration pattern for apps where a navigation framework (Jetpack Navigation, etc.) already handles Universal Links and custom scheme links, and posted-sdk is only needed for deferred deep link resolution on first install.
 
 ## Scenario represented
 
-- `MainActivity`: initializes Detour with `DEFERRED_ONLY` mode and calls `Detour.getDeferredLink()` directly on launch. No `DetourDelegate`, no intent processing.
+- `MainActivity`: initializes posted-sdk with `DEFERRED_ONLY` mode and calls `Posted.getDeferredLink()` directly on launch. No `PostedDelegate`, no intent processing.
 - `DeepLinkDestinationActivity`: simulated target screen the user lands on when a deferred link is matched.
 
 ## What this example covers
 
 - `LinkProcessingMode.DEFERRED_ONLY` configuration.
-- Manual `Detour.getDeferredLink()` call without `DetourDelegate`.
+- Manual `Posted.getDeferredLink()` call without `PostedDelegate`.
 - All four `LinkResult` states: `Success`, `NotFirstLaunch`, `NoLink`, `Error`.
 - Splash screen pattern for seamless deferred deep link UX.
 
@@ -29,13 +29,13 @@ This pattern is the recommended approach for production apps: the deferred link 
 
 1) Start the app — splash shows briefly while `getDeferredLink()` runs.
 2) **Not first launch:** splash exits, status shows "Not first launch — deferred link already consumed".
-3) **No deferred link:** uninstall, reinstall, and launch with no prior Detour link — splash exits, status shows "No deferred link matched".
-4) **With a deferred link:** uninstall, visit a Detour link, install the app and launch it — splash stays until the link resolves, then the app navigates directly to `DeepLinkDestinationActivity`.
+3) **No deferred link:** uninstall, reinstall, and launch with no prior posted-sdk link — splash exits, status shows "No deferred link matched".
+4) **With a deferred link:** uninstall, visit a posted-sdk link, install the app and launch it — splash stays until the link resolves, then the app navigates directly to `DeepLinkDestinationActivity`.
 
 ## Quick start
 
-1. Configure this app in the [Detour Dashboard](https://godetour.dev). You'll need two values:
-   - **Package name:** `com.swmansion.detour.example.deferred` (from `AndroidManifest.xml`)
+1. Configure this app in the Posted Dashboard. You'll need two values:
+   - **Package name:** `com.postedapp.posted.example.deferred` (from `AndroidManifest.xml`)
    - **SHA256 certificate fingerprint** — run this to get it from your debug keystore:
      ```shell
      keytool -list -v \
@@ -50,7 +50,7 @@ This pattern is the recommended approach for production apps: the deferred link 
 2. Add your credentials from the Dashboard — either via a secrets file:
    ```shell
    cp secrets.properties.example secrets.properties
-   # then edit secrets.properties with your DETOUR_API_KEY and DETOUR_APP_ID
+   # then edit secrets.properties with your POSTED_API_KEY and POSTED_APP_ID
    ```
    or by hardcoding them directly in `MainActivity.kt`.
 
@@ -59,4 +59,4 @@ This pattern is the recommended approach for production apps: the deferred link 
    ./gradlew :examples:example-deferred-only:installDebug
    ```
 
-4. Test deferred links: uninstall, copy a Detour link from the Dashboard, install and launch — the deferred link resolves on first open.
+4. Test deferred links: uninstall, copy a posted-sdk link from the Dashboard, install and launch — the deferred link resolves on first open.

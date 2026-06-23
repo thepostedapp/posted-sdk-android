@@ -13,11 +13,11 @@ val secrets = Properties().apply {
 }
 
 android {
-    namespace = "com.swmansion.detour.example"
+    namespace = "com.postedapp.posted.example"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.swmansion.detour.example"
+        applicationId = "com.postedapp.posted.example"
         minSdk = 23
         targetSdk = 34
         versionCode = 1
@@ -25,8 +25,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "DETOUR_API_KEY", "\"${secrets["DETOUR_API_KEY"] ?: ""}\"")
-        buildConfigField("String", "DETOUR_APP_ID", "\"${secrets["DETOUR_APP_ID"] ?: ""}\"")
+        buildConfigField("String", "POSTED_API_KEY", "\"${secrets["POSTED_API_KEY"] ?: ""}\"")
+        buildConfigField("String", "POSTED_APP_ID", "\"${secrets["POSTED_APP_ID"] ?: ""}\"")
     }
 
     buildTypes {
@@ -55,8 +55,8 @@ android {
 }
 
 dependencies {
-    // Detour SDK
-    implementation(project(":detour-sdk"))
+    // posted-sdk
+    implementation(project(":posted-sdk"))
 
     // Encrypted storage for custom storage example
     implementation("androidx.security:security-crypto:1.1.0-alpha06")

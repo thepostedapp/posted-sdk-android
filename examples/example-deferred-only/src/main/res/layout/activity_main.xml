@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:padding="16dp"
-    tools:context="com.swmansion.detour.example.deferred.MainActivity">
+    tools:context="com.postedapp.posted.example.deferred.MainActivity">
 
     <TextView
         android:id="@+id/titleText"
@@ -13,7 +13,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="32dp"
         android:gravity="center"
-        android:text="Detour — Deferred-Only Example"
+        android:text="posted-sdk — Deferred-Only Example"
         android:textSize="24sp"
         android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
@@ -26,7 +26,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:gravity="center"
-        android:text="LinkProcessingMode.DEFERRED_ONLY\nManual getDeferredLink() — no DetourDelegate"
+        android:text="LinkProcessingMode.DEFERRED_ONLY\nManual getDeferredLink() — no PostedDelegate"
         android:textSize="13sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"

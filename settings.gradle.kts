@@ -19,7 +19,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "com.swmansion.detour"
-include(":detour-sdk")
+rootProject.name = "com.postedapp.posted"
+include(":posted-sdk")
 include(":examples:example")
 include(":examples:example-deferred-only")
