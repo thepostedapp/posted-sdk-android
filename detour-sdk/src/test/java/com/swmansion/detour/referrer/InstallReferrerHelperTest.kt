@@ -11,7 +11,6 @@ import org.robolectric.RuntimeEnvironment
 
 @RunWith(RobolectricTestRunner::class)
 class InstallReferrerHelperTest {
-
     private lateinit var helper: InstallReferrerHelper
 
     @Before

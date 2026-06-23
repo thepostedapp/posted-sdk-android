@@ -13,5 +13,5 @@ import com.google.gson.annotations.SerializedName
 data class ShortLinkResponse(
     @SerializedName("link") val link: String,
     @SerializedName("route") val route: String?,
-    @SerializedName("parameters") val parameters: String?
+    @SerializedName("parameters") val parameters: String?,
 )

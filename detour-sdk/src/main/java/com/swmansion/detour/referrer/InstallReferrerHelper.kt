@@ -15,69 +15,72 @@ import kotlin.coroutines.resume
  * Helper for retrieving install referrer information.
  */
 internal class InstallReferrerHelper(private val context: Context) {
-
     /**
      * Get click ID from install referrer if available.
      * Returns null if not available or on error.
      */
-    suspend fun getClickId(): String? = withContext(Dispatchers.IO) {
-        try {
-            val referrerUrl = getInstallReferrer() ?: return@withContext null
-            extractClickId(referrerUrl)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error getting install referrer", e)
-            null
-        }
-    }
-
-    private suspend fun getInstallReferrer(): String? = suspendCancellableCoroutine { continuation ->
-        val referrerClient = InstallReferrerClient.newBuilder(context).build()
-        val completed = AtomicBoolean(false)
-
-        fun resumeOnce(value: String?) {
-            if (!completed.compareAndSet(false, true)) return
-
+    suspend fun getClickId(): String? =
+        withContext(Dispatchers.IO) {
             try {
-                referrerClient.endConnection()
+                val referrerUrl = getInstallReferrer() ?: return@withContext null
+                extractClickId(referrerUrl)
             } catch (e: Exception) {
-                Log.e(TAG, "Error ending connection", e)
-            }
-
-            if (continuation.isActive) {
-                continuation.resume(value)
+                Log.e(TAG, "Error getting install referrer", e)
+                null
             }
         }
 
-        referrerClient.startConnection(object : InstallReferrerStateListener {
-            override fun onInstallReferrerSetupFinished(responseCode: Int) {
-                when (responseCode) {
-                    InstallReferrerClient.InstallReferrerResponse.OK -> {
-                        try {
-                            val response = referrerClient.installReferrer
-                            val referrerUrl = response.installReferrer
-                            resumeOnce(referrerUrl)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error reading install referrer", e)
-                            resumeOnce(null)
-                        }
-                    }
-                    else -> {
-                        Log.w(TAG, "Install referrer response code: $responseCode")
-                        resumeOnce(null)
-                    }
+    private suspend fun getInstallReferrer(): String? =
+        suspendCancellableCoroutine { continuation ->
+            val referrerClient = InstallReferrerClient.newBuilder(context).build()
+            val completed = AtomicBoolean(false)
+
+            fun resumeOnce(value: String?) {
+                if (!completed.compareAndSet(false, true)) return
+
+                try {
+                    referrerClient.endConnection()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error ending connection", e)
+                }
+
+                if (continuation.isActive) {
+                    continuation.resume(value)
                 }
             }
 
-            override fun onInstallReferrerServiceDisconnected() {
-                Log.w(TAG, "Install referrer service disconnected")
+            referrerClient.startConnection(
+                object : InstallReferrerStateListener {
+                    override fun onInstallReferrerSetupFinished(responseCode: Int) {
+                        when (responseCode) {
+                            InstallReferrerClient.InstallReferrerResponse.OK -> {
+                                try {
+                                    val response = referrerClient.installReferrer
+                                    val referrerUrl = response.installReferrer
+                                    resumeOnce(referrerUrl)
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Error reading install referrer", e)
+                                    resumeOnce(null)
+                                }
+                            }
+                            else -> {
+                                Log.w(TAG, "Install referrer response code: $responseCode")
+                                resumeOnce(null)
+                            }
+                        }
+                    }
+
+                    override fun onInstallReferrerServiceDisconnected() {
+                        Log.w(TAG, "Install referrer service disconnected")
+                        resumeOnce(null)
+                    }
+                },
+            )
+
+            continuation.invokeOnCancellation {
                 resumeOnce(null)
             }
-        })
-
-        continuation.invokeOnCancellation {
-            resumeOnce(null)
         }
-    }
 
     @VisibleForTesting
     internal fun extractClickId(referrerUrl: String): String? {

@@ -13,39 +13,28 @@ sealed interface DeviceFingerprint
 data class ProbabilisticFingerprint(
     @SerializedName("platform")
     val platform: String,
-    
     @SerializedName("model")
     val model: String,
-    
     @SerializedName("manufacturer")
     val manufacturer: String,
-    
     @SerializedName("systemVersion")
     val systemVersion: String,
-    
     @SerializedName("screenWidth")
     val screenWidth: Int,
-    
     @SerializedName("screenHeight")
     val screenHeight: Int,
-    
     @SerializedName("scale")
     val scale: Float,
-    
     @SerializedName("locale")
     val locale: List<LocaleInfo>,
-    
     @SerializedName("timezone")
     val timezone: String?,
-    
     @SerializedName("userAgent")
     val userAgent: String?,
-    
     @SerializedName("timestamp")
     val timestamp: Long,
-    
     @SerializedName("pastedLink")
-    val pastedLink: String? = null
+    val pastedLink: String? = null,
 ) : DeviceFingerprint
 
 /**
@@ -53,7 +42,7 @@ data class ProbabilisticFingerprint(
  */
 data class DeterministicFingerprint(
     @SerializedName("clickId")
-    val clickId: String
+    val clickId: String,
 ) : DeviceFingerprint
 
 /**
@@ -61,7 +50,7 @@ data class DeterministicFingerprint(
  */
 data class LocaleInfo(
     @SerializedName("languageTag")
-    val languageTag: String
+    val languageTag: String,
 )
 
 /**
@@ -69,5 +58,5 @@ data class LocaleInfo(
  */
 data class LinkMatchResponse(
     @SerializedName("link")
-    val link: String?
+    val link: String?,
 )

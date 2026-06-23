@@ -13,18 +13,19 @@ import java.util.concurrent.TimeUnit
  * A single Gson instance avoids repeated reflection overhead.
  */
 internal object HttpClient {
-
-    val okHttp: OkHttpClient = OkHttpClient.Builder()
-        .callTimeout(15, TimeUnit.SECONDS)
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .writeTimeout(10, TimeUnit.SECONDS)
-        .build()
+    val okHttp: OkHttpClient =
+        OkHttpClient.Builder()
+            .callTimeout(15, TimeUnit.SECONDS)
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .writeTimeout(10, TimeUnit.SECONDS)
+            .build()
 
     // Shared connection pool, tighter call timeout for link-gate requests.
-    val shortTimeoutOkHttp: OkHttpClient = okHttp.newBuilder()
-        .callTimeout(5, TimeUnit.SECONDS)
-        .build()
+    val shortTimeoutOkHttp: OkHttpClient =
+        okHttp.newBuilder()
+            .callTimeout(5, TimeUnit.SECONDS)
+            .build()
 
     val gson: Gson = Gson()
 

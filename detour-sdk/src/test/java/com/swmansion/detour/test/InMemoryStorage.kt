@@ -6,12 +6,14 @@ import com.swmansion.detour.storage.DetourStorage
  * In-memory storage implementation for unit tests.
  */
 class InMemoryStorage : DetourStorage {
-
     private val store = mutableMapOf<String, String>()
 
     override suspend fun getItem(key: String): String? = store[key]
 
-    override suspend fun setItem(key: String, value: String) {
+    override suspend fun setItem(
+        key: String,
+        value: String,
+    ) {
         store[key] = value
     }
 

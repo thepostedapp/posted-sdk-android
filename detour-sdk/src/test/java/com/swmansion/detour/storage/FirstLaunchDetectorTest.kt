@@ -8,7 +8,6 @@ import org.junit.Before
 import org.junit.Test
 
 class FirstLaunchDetectorTest {
-
     private lateinit var storage: InMemoryStorage
     private lateinit var detector: FirstLaunchDetector
 
@@ -19,19 +18,22 @@ class FirstLaunchDetectorTest {
     }
 
     @Test
-    fun `isFirstLaunch returns true on fresh storage`() = runTest {
-        assertTrue(detector.isFirstLaunch())
-    }
+    fun `isFirstLaunch returns true on fresh storage`() =
+        runTest {
+            assertTrue(detector.isFirstLaunch())
+        }
 
     @Test
-    fun `isFirstLaunch returns false after markAsLaunched`() = runTest {
-        detector.markAsLaunched()
-        assertFalse(detector.isFirstLaunch())
-    }
+    fun `isFirstLaunch returns false after markAsLaunched`() =
+        runTest {
+            detector.markAsLaunched()
+            assertFalse(detector.isFirstLaunch())
+        }
 
     @Test
-    fun `isFirstLaunch returns true when flag is not the string true`() = runTest {
-        storage.setItem(StorageKeys.FIRST_ENTRANCE_FLAG, "false")
-        assertTrue(detector.isFirstLaunch())
-    }
+    fun `isFirstLaunch returns true when flag is not the string true`() =
+        runTest {
+            storage.setItem(StorageKeys.FIRST_ENTRANCE_FLAG, "false")
+            assertTrue(detector.isFirstLaunch())
+        }
 }

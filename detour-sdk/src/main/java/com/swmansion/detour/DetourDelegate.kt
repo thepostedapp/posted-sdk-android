@@ -52,9 +52,8 @@ import kotlinx.coroutines.launch
 class DetourDelegate(
     private val lifecycleOwner: LifecycleOwner,
     val config: DetourConfig,
-    private val onLinkResult: (LinkResult) -> Unit
+    private val onLinkResult: (LinkResult) -> Unit,
 ) {
-
     /**
      * Call from Activity.onCreate() to handle Universal, Scheme, and Deferred links.
      *
