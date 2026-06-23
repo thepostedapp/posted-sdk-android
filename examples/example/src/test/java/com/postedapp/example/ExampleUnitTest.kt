@@ -1,4 +1,4 @@
-package com.swmansion.example
+package com.postedapp.example
 
 import org.junit.Test
 import org.junit.Assert.*
