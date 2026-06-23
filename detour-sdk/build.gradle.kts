@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.vanniktech.maven.publish)
+    alias(libs.plugins.detekt)
 }
 
 version = "1.1.0"
@@ -41,6 +42,11 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+}
+
+detekt {
+    config.from(rootProject.file("detekt-correctness.yml"))
+    buildUponDefaultConfig = false
 }
 
 dependencies {
