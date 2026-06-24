@@ -75,7 +75,7 @@ mavenPublishing {
     pom {
         name = "posted-sdk Android"
         description = "SDK for handling deferred deep links on Android."
-        url = "https://github.com/postedapp/android-detour"
+        url = "https://github.com/thepostedapp/android-detour"
         licenses {
             license {
                 name = "The MIT License"
@@ -83,9 +83,9 @@ mavenPublishing {
             }
         }
         scm {
-            connection = "scm:git:git://github.com/postedapp/android-detour.git"
-            developerConnection = "scm:git:ssh://github.com/postedapp/android-detour.git"
-            url = "https://github.com/postedapp/android-detour"
+            connection = "scm:git:git://github.com/thepostedapp/android-detour.git"
+            developerConnection = "scm:git:ssh://github.com/thepostedapp/android-detour.git"
+            url = "https://github.com/thepostedapp/android-detour"
         }
         developers {
             developer {
