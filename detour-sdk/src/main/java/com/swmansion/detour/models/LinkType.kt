@@ -19,5 +19,5 @@ enum class LinkType {
     /**
      * Custom scheme deep link (e.g. myapp://product/123).
      */
-    SCHEME
+    SCHEME,
 }

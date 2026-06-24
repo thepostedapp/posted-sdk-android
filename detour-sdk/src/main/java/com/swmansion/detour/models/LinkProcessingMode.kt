@@ -22,5 +22,5 @@ enum class LinkProcessingMode {
      * Only handle deferred links. No runtime link listener, no initial URL check, no scheme links.
      * Recommended when your navigation framework already resolves runtime and initial links.
      */
-    DEFERRED_ONLY
+    DEFERRED_ONLY,
 }

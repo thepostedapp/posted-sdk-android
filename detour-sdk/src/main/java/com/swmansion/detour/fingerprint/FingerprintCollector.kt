@@ -16,7 +16,6 @@ import java.util.TimeZone
  * Collects device fingerprint data for link matching.
  */
 internal class FingerprintCollector(private val context: Context) {
-
     /**
      * Collect probabilistic device fingerprint.
      *
@@ -42,7 +41,7 @@ internal class FingerprintCollector(private val context: Context) {
                 timezone = timezone.id,
                 userAgent = getUserAgent(),
                 timestamp = System.currentTimeMillis(),
-                pastedLink = null
+                pastedLink = null,
             )
         }
 
@@ -57,7 +56,7 @@ internal class FingerprintCollector(private val context: Context) {
                 return ScreenMetrics(
                     (bounds.width() / density).toInt(),
                     (bounds.height() / density).toInt(),
-                    density
+                    density,
                 )
             }
         }
@@ -66,7 +65,7 @@ internal class FingerprintCollector(private val context: Context) {
         return ScreenMetrics(
             (dm.widthPixels / dm.density).toInt(),
             (dm.heightPixels / dm.density).toInt(),
-            dm.density
+            dm.density,
         )
     }
 

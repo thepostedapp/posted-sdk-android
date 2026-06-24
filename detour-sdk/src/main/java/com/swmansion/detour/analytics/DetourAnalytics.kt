@@ -16,7 +16,6 @@ import kotlinx.coroutines.launch
  * and never propagate exceptions to the caller.
  */
 object DetourAnalytics {
-
     private const val TAG = "DetourAnalytics"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -33,7 +32,10 @@ object DetourAnalytics {
     /**
      * Internal — called from [com.swmansion.detour.Detour.initialize].
      */
-    internal fun initialize(config: DetourConfig, storage: DetourStorage) {
+    internal fun initialize(
+        config: DetourConfig,
+        storage: DetourStorage,
+    ) {
         apiClient = AnalyticsApiClient(config)
         deviceIdProvider = DeviceIdProvider(storage)
         isInitialized = true
@@ -47,7 +49,10 @@ object DetourAnalytics {
      */
     @JvmStatic
     @JvmOverloads
-    fun logEvent(eventName: DetourEventNames, data: Any? = null) {
+    fun logEvent(
+        eventName: DetourEventNames,
+        data: Any? = null,
+    ) {
         if (!isInitialized) {
             Log.w(TAG, "[Detour:ANALYTICS] Analytics not initialized — call Detour.initialize() first")
             return

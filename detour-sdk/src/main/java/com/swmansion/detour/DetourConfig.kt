@@ -16,7 +16,7 @@ data class DetourConfig(
     val apiKey: String,
     val appId: String,
     val linkProcessingMode: LinkProcessingMode = LinkProcessingMode.ALL,
-    val storage: DetourStorage? = null
+    val storage: DetourStorage? = null,
 ) {
     /**
      * Builder for Java callers (data class defaults don't work from Java).
@@ -32,13 +32,15 @@ data class DetourConfig(
         private var storage: DetourStorage? = null
 
         fun linkProcessingMode(value: LinkProcessingMode) = apply { linkProcessingMode = value }
+
         fun storage(value: DetourStorage) = apply { storage = value }
 
-        fun build(): DetourConfig = DetourConfig(
-            apiKey = apiKey,
-            appId = appId,
-            linkProcessingMode = linkProcessingMode,
-            storage = storage
-        )
+        fun build(): DetourConfig =
+            DetourConfig(
+                apiKey = apiKey,
+                appId = appId,
+                linkProcessingMode = linkProcessingMode,
+                storage = storage,
+            )
     }
 }

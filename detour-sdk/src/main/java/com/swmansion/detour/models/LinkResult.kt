@@ -20,7 +20,7 @@ sealed class LinkResult {
         val route: String,
         val pathname: String,
         val type: LinkType,
-        val params: Map<String, String> = emptyMap()
+        val params: Map<String, String> = emptyMap(),
     ) : LinkResult()
 
     /**

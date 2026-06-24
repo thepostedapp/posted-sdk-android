@@ -13,7 +13,6 @@ import java.util.UUID
  * pattern with a [Mutex] to prevent concurrent generation of different IDs.
  */
 internal class DeviceIdProvider(private val storage: DetourStorage) {
-
     @Volatile
     private var cachedId: String? = null
 

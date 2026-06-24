@@ -2,11 +2,10 @@ package com.swmansion.detour.storage
 
 /**
  * Detects if this is the first app launch using a configurable storage implementation.
- * 
+ *
  * Storage key used: `Detour_firstEntranceFlag`
  */
 internal class FirstLaunchDetector(private val storage: DetourStorage) {
-
     /**
      * Check if this is the first app launch.
      */

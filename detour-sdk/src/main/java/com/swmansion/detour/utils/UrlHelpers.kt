@@ -13,7 +13,6 @@ import java.net.URLDecoder
  * strip that first segment so the consumer receives `/products/123`.
  */
 internal object UrlHelpers {
-
     private const val TAG = "UrlHelpers"
 
     /**
@@ -79,11 +78,12 @@ internal object UrlHelpers {
         val query = uri.query
 
         val hostPart = if (host.isBlank()) "" else "/$host"
-        val pathPart = when {
-            path.isBlank() -> ""
-            path.startsWith("/") -> path
-            else -> "/$path"
-        }
+        val pathPart =
+            when {
+                path.isBlank() -> ""
+                path.startsWith("/") -> path
+                else -> "/$path"
+            }
         val baseRoute = if (hostPart.isBlank() && pathPart.isBlank()) "/" else "$hostPart$pathPart"
 
         return if (query.isNullOrBlank()) {
