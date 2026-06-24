@@ -6,7 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:padding="16dp"
-    tools:context="com.swmansion.detour.example.MainActivity">
+    tools:context="com.postedapp.posted.example.MainActivity">
 
     <TextView
         android:id="@+id/titleText"
@@ -14,7 +14,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="32dp"
         android:gravity="center"
-        android:text="Detour Android SDK Demo"
+        android:text="posted-sdk Demo"
         android:textSize="24sp"
         android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"

@@ -2,18 +2,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
   <application
-    android:name="com.swmansion.detour.example.deferred.DetourDeferredApp"
+    android:name="com.postedapp.posted.example.deferred.PostedDeferredApp"
     android:allowBackup="true"
     android:icon="@mipmap/ic_launcher"
     android:label="@string/app_name"
     android:roundIcon="@mipmap/ic_launcher_round"
     android:supportsRtl="true"
-    android:theme="@style/Theme.DetourAndroidSDK">
+    android:theme="@style/Theme.PostedAndroidSDK">
 
     <activity
-      android:name="com.swmansion.detour.example.deferred.MainActivity"
+      android:name="com.postedapp.posted.example.deferred.MainActivity"
       android:exported="true"
-      android:theme="@style/Theme.DetourAndroidSDK.Splash">
+      android:theme="@style/Theme.PostedAndroidSDK.Splash">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
@@ -22,16 +22,16 @@
         <action android:name="android.intent.action.VIEW" />
         <category android:name="android.intent.category.DEFAULT" />
         <category android:name="android.intent.category.BROWSABLE" />
-        <data android:scheme="detour-deferred-only-example-app" />
+        <data android:scheme="posted-deferred-only-example-app" />
       </intent-filter>
       <!-- PASTE YOUR DASHBOARD LINK CONFIGURATION HERE -->
     </activity>
 
     <activity
-      android:name="com.swmansion.detour.example.deferred.DeepLinkDestinationActivity"
+      android:name="com.postedapp.posted.example.deferred.DeepLinkDestinationActivity"
       android:exported="false"
-      android:parentActivityName="com.swmansion.detour.example.deferred.MainActivity"
-      android:theme="@style/Theme.DetourAndroidSDK" />
+      android:parentActivityName="com.postedapp.posted.example.deferred.MainActivity"
+      android:theme="@style/Theme.PostedAndroidSDK" />
 
   </application>
 

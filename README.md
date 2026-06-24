@@ -1,22 +1,6 @@
-<img src="https://github.com/user-attachments/assets/c965b51b-7307-477a-8d22-9c9cd6da6231" alt="Detour Android SDK by Software Mansion" width="100%"/>
+# posted-sdk for Android
 
-[![Ad](https://revive-adserver.swmansion.com/www/images/zone-gh-android-detour-1?n=1)](https://revive-adserver.swmansion.com/www/delivery/ck.php?zoneid=zone-gh-android-detour-1&n=1)
-[![Ad](https://revive-adserver.swmansion.com/www/images/zone-gh-android-detour-2?n=1)](https://revive-adserver.swmansion.com/www/delivery/ck.php?zoneid=zone-gh-android-detour-2&n=1)
-[![Ad](https://revive-adserver.swmansion.com/www/images/zone-gh-android-detour-3?n=1)](https://revive-adserver.swmansion.com/www/delivery/ck.php?zoneid=zone-gh-android-detour-3&n=1)
-
-# Detour Android SDK
-
-Detour is an Android SDK for handling deferred deep links. A deferred link works like a regular deep link, but survives the Play Store install — a user who clicks a link before having the app installed is redirected to the right screen on first launch. Detour also handles App Links and custom scheme links in a single unified API.
-
-## Quick links
-
-- Documentation: [https://detour.swmansion.com/docs/](https://detour.swmansion.com/docs/)
-- Installation guide: [https://detour.swmansion.com/docs/sdk/android/sdk-installation](https://detour.swmansion.com/docs/sdk/android/sdk-installation)
-
-## Create an account
-
-You need a Detour account to generate app credentials and configure your links.  
-Sign up here: [https://godetour.dev/auth/signup](https://godetour.dev/auth/signup)
+posted-sdk is an Android SDK for handling deferred deep links. A deferred link works like a regular deep link, but survives the Play Store install — a user who clicks a link before having the app installed is redirected to the right screen on first launch. posted-sdk also handles App Links and custom scheme links in a single unified API.
 
 ## Installation
 
@@ -24,7 +8,7 @@ Add the SDK to your `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.swmansion.detour:detour-sdk:1.1.0")
+    implementation("com.postedapp:posted-sdk:2.0.0")
 }
 ```
 
@@ -45,24 +29,24 @@ The following permissions are included automatically:
 
 ## Usage
 
-Initialize the SDK and use `DetourDelegate` in your Activity:
+Initialize the SDK and use `PostedDelegate` in your Activity:
 
 <details>
 <summary>Usage example</summary>
 
 ```kotlin
 import android.util.Log
-import com.swmansion.detour.Detour
-import com.swmansion.detour.DetourConfig
-import com.swmansion.detour.DetourDelegate
-import com.swmansion.detour.models.LinkResult
-import com.swmansion.detour.models.LinkType
+import com.postedapp.posted.Posted
+import com.postedapp.posted.PostedConfig
+import com.postedapp.posted.PostedDelegate
+import com.postedapp.posted.models.LinkResult
+import com.postedapp.posted.models.LinkType
 
 class MainActivity : AppCompatActivity() {
 
-    private val detourDelegate = DetourDelegate(
+    private val postedDelegate = PostedDelegate(
         lifecycleOwner = this,
-        config = DetourConfig(
+        config = PostedConfig(
             appId = "<REPLACE_WITH_APP_ID_FROM_PLATFORM>",
             apiKey = "<REPLACE_WITH_YOUR_API_KEY>"
         ),
@@ -73,14 +57,14 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        Detour.initialize(this, detourDelegate.config)
-        detourDelegate.onCreate(intent)
+        Posted.initialize(this, postedDelegate.config)
+        postedDelegate.onCreate(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        detourDelegate.onNewIntent(intent)
+        postedDelegate.onNewIntent(intent)
     }
 
     private fun handleLinkResult(result: LinkResult) {
@@ -106,7 +90,7 @@ class MainActivity : AppCompatActivity() {
 
 </details>
 
-### Manual control without DetourDelegate
+### Manual control without PostedDelegate
 
 <details>
 <summary>Manual control example</summary>
@@ -117,14 +101,14 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val config = DetourConfig(
+        val config = PostedConfig(
             appId = "<REPLACE_WITH_APP_ID_FROM_PLATFORM>",
             apiKey = "<REPLACE_WITH_YOUR_API_KEY>"
         )
-        Detour.initialize(this, config)
+        Posted.initialize(this, config)
 
         lifecycleScope.launch {
-            val result = Detour.processLink(intent)
+            val result = Posted.processLink(intent)
             // handle result
         }
     }
@@ -133,7 +117,7 @@ class MainActivity : AppCompatActivity() {
 
 </details>
 
-### Controlling which links Detour processes
+### Controlling which links posted-sdk processes
 
 Use `linkProcessingMode` to control which link sources the SDK handles:
 
@@ -147,7 +131,7 @@ Use `linkProcessingMode` to control which link sources the SDK handles:
 <summary>linkProcessingMode config example</summary>
 
 ```kotlin
-val config = DetourConfig(
+val config = PostedConfig(
     appId = "<REPLACE_WITH_APP_ID_FROM_PLATFORM>",
     apiKey = "<REPLACE_WITH_YOUR_API_KEY>",
     linkProcessingMode = LinkProcessingMode.WEB_ONLY
@@ -160,18 +144,18 @@ Use `DEFERRED_ONLY` when your navigation framework already handles App Links and
 
 ### Custom storage
 
-The SDK uses `SharedPreferences` by default. You can provide a custom storage implementation via `DetourConfig`:
+The SDK uses `SharedPreferences` by default. You can provide a custom storage implementation via `PostedConfig`:
 
 <details>
 <summary>Custom storage example</summary>
 
 ```kotlin
-import com.swmansion.detour.storage.DetourStorage
+import com.postedapp.posted.storage.PostedStorage
 
-class EncryptedStorageProvider(context: Context) : DetourStorage {
+class EncryptedStorageProvider(context: Context) : PostedStorage {
     private val prefs = EncryptedSharedPreferences.create(
         context,
-        "DetourSecure",
+        "PostedSecure",
         MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
@@ -185,7 +169,7 @@ class EncryptedStorageProvider(context: Context) : DetourStorage {
     }
 }
 
-val config = DetourConfig(
+val config = PostedConfig(
     appId = "<REPLACE_WITH_APP_ID_FROM_PLATFORM>",
     apiKey = "<REPLACE_WITH_YOUR_API_KEY>",
     storage = EncryptedStorageProvider(this)
@@ -196,48 +180,46 @@ val config = DetourConfig(
 
 ## Analytics
 
-The SDK includes a built-in analytics module. `Detour.initialize()` automatically tracks app opens for retention. You can also log custom events using the predefined `DetourEventNames` enum:
+The SDK includes a built-in analytics module. `Posted.initialize()` automatically tracks app opens for retention. You can also log custom events using the predefined `PostedEventNames` enum:
 
 <details>
 <summary>Analytics example</summary>
 
 ```kotlin
-import com.swmansion.detour.analytics.DetourAnalytics
-import com.swmansion.detour.analytics.DetourEventNames
+import com.postedapp.posted.analytics.PostedAnalytics
+import com.postedapp.posted.analytics.PostedEventNames
 
-DetourAnalytics.logEvent(DetourEventNames.Purchase)
-DetourAnalytics.logRetention("week_1")
+PostedAnalytics.logEvent(PostedEventNames.Purchase)
+PostedAnalytics.logRetention("week_1")
 ```
 
 </details>
 
-See the [analytics docs](https://detour.swmansion.com/docs/) for the full event list and retention tracking setup.
-
 ## Types
 
-### DetourConfig
+### PostedConfig
 
 <details>
-<summary>DetourConfig</summary>
+<summary>PostedConfig</summary>
 
 ```kotlin
-data class DetourConfig(
-    /** Your API key from the Detour dashboard. */
+data class PostedConfig(
+    /** Your API key from the Posted dashboard. */
     val apiKey: String,
 
-    /** Your application ID from the Detour dashboard. */
+    /** Your application ID from the Posted dashboard. */
     val appId: String,
 
     /**
      * Controls which link sources are handled by the SDK (default: ALL).
      * - ALL: deferred + App Links + custom scheme links
-     * - WEB_ONLY: deferred + App Links, but NOT custom scheme links
+     * - WEB_ONLY: deferred + App Links, no custom scheme links
      * - DEFERRED_ONLY: only deferred links (no intent processing)
      */
     val linkProcessingMode: LinkProcessingMode = LinkProcessingMode.ALL,
 
     /** Custom storage implementation (defaults to SharedPreferences). */
-    val storage: DetourStorage? = null
+    val storage: PostedStorage? = null
 )
 ```
 
@@ -296,13 +278,13 @@ enum class LinkProcessingMode {
 
 </details>
 
-### DetourStorage
+### PostedStorage
 
 <details>
-<summary>DetourStorage</summary>
+<summary>PostedStorage</summary>
 
 ```kotlin
-interface DetourStorage {
+interface PostedStorage {
     suspend fun getItem(key: String): String?
     suspend fun setItem(key: String, value: String)
     suspend fun removeItem(key: String) { /* optional */ }
@@ -313,15 +295,15 @@ interface DetourStorage {
 
 ## API Reference
 
-### Detour
+### Posted
 
 <details>
-<summary>Detour singleton</summary>
+<summary>Posted singleton</summary>
 
 ```kotlin
-object Detour {
+object Posted {
     /** Initialize SDK — call once in Application.onCreate() or Activity.onCreate(). */
-    fun initialize(context: Context, config: DetourConfig)
+    fun initialize(context: Context, config: PostedConfig)
 
     /** Process intent and extract deep link (App Link, scheme, or deferred). */
     suspend fun processLink(intent: Intent): LinkResult
@@ -336,15 +318,15 @@ object Detour {
 
 </details>
 
-### DetourDelegate
+### PostedDelegate
 
 <details>
-<summary>DetourDelegate</summary>
+<summary>PostedDelegate</summary>
 
 ```kotlin
-class DetourDelegate(
+class PostedDelegate(
     private val lifecycleOwner: LifecycleOwner,
-    val config: DetourConfig,
+    val config: PostedConfig,
     private val onLinkResult: (LinkResult) -> Unit
 ) {
     fun onCreate(intent: Intent)
@@ -354,15 +336,15 @@ class DetourDelegate(
 
 </details>
 
-### DetourAnalytics
+### PostedAnalytics
 
 <details>
-<summary>DetourAnalytics</summary>
+<summary>PostedAnalytics</summary>
 
 ```kotlin
-object DetourAnalytics {
+object PostedAnalytics {
     /** Log a predefined analytics event with optional data. */
-    fun logEvent(eventName: DetourEventNames, data: Any? = null)
+    fun logEvent(eventName: PostedEventNames, data: Any? = null)
 
     /** Log a retention event. */
     fun logRetention(eventName: String)
@@ -371,22 +353,8 @@ object DetourAnalytics {
 
 </details>
 
-## Other Detour SDKs
-
-Detour is also available for other app stacks:
-
-- iOS SDK: [https://github.com/software-mansion-labs/ios-detour](https://github.com/software-mansion-labs/ios-detour)
-- Flutter SDK: [https://github.com/software-mansion-labs/detour-flutter-plugin](https://github.com/software-mansion-labs/detour-flutter-plugin)
-- React Native SDK: [https://github.com/software-mansion-labs/react-native-detour](https://github.com/software-mansion-labs/react-native-detour)
-
 ---
 
 ## License
 
 This library is licensed under [The MIT License](./LICENSE).
-
-## Detour Android SDK is created by Software Mansion
-
-Since 2012, [Software Mansion](https://swmansion.com) is a software agency with experience in building web and mobile apps. We are Core React Native Contributors and experts in dealing with all kinds of React Native issues. We can help you build your next dream product – [Hire us](https://swmansion.com/contact/projects?utm_source=detour&utm_medium=readme).
-
-[![swm](https://logo.swmansion.com/logo?color=white&variant=desktop&width=150&tag=android-detour-github "Software Mansion")](https://swmansion.com)

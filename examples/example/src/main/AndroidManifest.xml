@@ -2,18 +2,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
   <application
-    android:name="com.swmansion.detour.example.DetourExampleApp"
+    android:name="com.postedapp.posted.example.PostedExampleApp"
     android:allowBackup="true"
     android:icon="@mipmap/ic_launcher"
     android:label="@string/app_name"
     android:roundIcon="@mipmap/ic_launcher_round"
     android:supportsRtl="true"
-    android:theme="@style/Theme.DetourAndroidSDK">
+    android:theme="@style/Theme.PostedAndroidSDK">
 
     <activity
-      android:name="com.swmansion.detour.example.MainActivity"
+      android:name="com.postedapp.posted.example.MainActivity"
       android:exported="true"
-      android:theme="@style/Theme.DetourAndroidSDK">
+      android:theme="@style/Theme.PostedAndroidSDK">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
@@ -22,20 +22,20 @@
         <action android:name="android.intent.action.VIEW" />
         <category android:name="android.intent.category.DEFAULT" />
         <category android:name="android.intent.category.BROWSABLE" />
-        <data android:scheme="detour-example-app" />
+        <data android:scheme="posted-example-app" />
       </intent-filter>
       <!-- PASTE YOUR DASHBOARD LINK CONFIGURATION HERE -->
     </activity>
 
     <activity
-      android:name="com.swmansion.detour.example.ProductActivity"
+      android:name="com.postedapp.posted.example.ProductActivity"
       android:exported="false"
-      android:theme="@style/Theme.DetourAndroidSDK" />
+      android:theme="@style/Theme.PostedAndroidSDK" />
 
     <activity
-      android:name="com.swmansion.detour.example.PromoActivity"
+      android:name="com.postedapp.posted.example.PromoActivity"
       android:exported="false"
-      android:theme="@style/Theme.DetourAndroidSDK" />
+      android:theme="@style/Theme.PostedAndroidSDK" />
 
   </application>
 
