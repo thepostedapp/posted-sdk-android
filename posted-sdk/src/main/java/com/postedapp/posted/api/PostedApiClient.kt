@@ -20,7 +20,11 @@ import java.io.IOException
  * NOTE: Backend URL (godetour.dev) is intentionally kept until B3 (new backend domain)
  * is confirmed live/redirecting by the board. See POS-39 prerequisites.
  */
-internal class PostedApiClient(private val config: PostedConfig, private val context: Context) {
+internal class PostedApiClient(
+    private val config: PostedConfig,
+    private val context: Context,
+    private val baseUrl: String = "https://godetour.dev",
+) {
 
     /**
      * Match link using fingerprint data.
@@ -33,7 +37,7 @@ internal class PostedApiClient(private val config: PostedConfig, private val con
         Log.d(TAG, "Sending fingerprint to API")
 
         val request = Request.Builder()
-            .url(MATCH_LINK_URL)
+            .url(matchLinkUrl)
             .post(json.toRequestBody(HttpClient.JSON))
             .addHeader("Content-Type", "application/json")
             .addHeader("Authorization", "Bearer ${config.apiKey}")
@@ -73,7 +77,7 @@ internal class PostedApiClient(private val config: PostedConfig, private val con
             val requestBody = payload.toRequestBody(HttpClient.JSON)
 
             val request = Request.Builder()
-                .url(RESOLVE_SHORT_URL)
+                .url(resolveShortUrl)
                 .post(requestBody)
                 .addHeader("Content-Type", "application/json")
                 .addHeader("Authorization", "Bearer ${config.apiKey}")
@@ -130,7 +134,7 @@ internal class PostedApiClient(private val config: PostedConfig, private val con
             if (params.isNotEmpty()) body["params"] = params
             val payload = HttpClient.gson.toJson(body)
             val request = Request.Builder()
-                .url(UNIVERSAL_LINK_CLICK_URL)
+                .url(universalLinkClickUrl)
                 .post(payload.toRequestBody(HttpClient.JSON))
                 .addHeader("Content-Type", "application/json")
                 .addHeader("Authorization", "Bearer ${config.apiKey}")
@@ -184,11 +188,11 @@ internal class PostedApiClient(private val config: PostedConfig, private val con
         )
     }
 
+    private val matchLinkUrl get() = "$baseUrl/api/link/match-link"
+    private val resolveShortUrl get() = "$baseUrl/api/link/resolve-short"
+    private val universalLinkClickUrl get() = "$baseUrl/api/link/universal-link-click"
+
     companion object {
         private const val TAG = "PostedApiClient"
-        // TODO(POS-39 B3): Update these URLs to the new backend domain once confirmed live/redirecting
-        private const val MATCH_LINK_URL = "https://godetour.dev/api/link/match-link"
-        private const val RESOLVE_SHORT_URL = "https://godetour.dev/api/link/resolve-short"
-        private const val UNIVERSAL_LINK_CLICK_URL = "https://godetour.dev/api/link/universal-link-click"
     }
 }

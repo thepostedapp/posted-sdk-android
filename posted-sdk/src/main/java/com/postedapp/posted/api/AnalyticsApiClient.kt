@@ -17,7 +17,10 @@ import java.util.TimeZone
  *
  * All methods are fire-and-forget: they log warnings on failure and never throw.
  */
-internal class AnalyticsApiClient(private val config: PostedConfig) {
+internal class AnalyticsApiClient(
+    private val config: PostedConfig,
+    private val baseUrl: String = "https://godetour.dev",
+) {
 
     private val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
         timeZone = TimeZone.getTimeZone("UTC")
@@ -45,7 +48,7 @@ internal class AnalyticsApiClient(private val config: PostedConfig) {
                 val requestBody = json.toRequestBody(HttpClient.JSON)
 
                 val request = Request.Builder()
-                    .url(EVENT_URL)
+                    .url(eventUrl)
                     .post(requestBody)
                     .addHeader("Content-Type", "application/json")
                     .addHeader("Authorization", "Bearer ${config.apiKey}")
@@ -83,7 +86,7 @@ internal class AnalyticsApiClient(private val config: PostedConfig) {
                 val requestBody = json.toRequestBody(HttpClient.JSON)
 
                 val request = Request.Builder()
-                    .url(RETENTION_URL)
+                    .url(retentionUrl)
                     .post(requestBody)
                     .addHeader("Content-Type", "application/json")
                     .addHeader("Authorization", "Bearer ${config.apiKey}")
@@ -101,10 +104,10 @@ internal class AnalyticsApiClient(private val config: PostedConfig) {
             }
         }
 
+    private val eventUrl get() = "$baseUrl/api/analytics/event"
+    private val retentionUrl get() = "$baseUrl/api/analytics/retention"
+
     companion object {
         private const val TAG = "AnalyticsApiClient"
-        // TODO(POS-39 B3): Update these URLs to the new backend domain once confirmed live/redirecting
-        private const val EVENT_URL = "https://godetour.dev/api/analytics/event"
-        private const val RETENTION_URL = "https://godetour.dev/api/analytics/retention"
     }
 }
