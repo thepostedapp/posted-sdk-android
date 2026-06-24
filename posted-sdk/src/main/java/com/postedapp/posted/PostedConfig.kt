@@ -16,7 +16,7 @@ data class PostedConfig(
     val apiKey: String,
     val appId: String,
     val linkProcessingMode: LinkProcessingMode = LinkProcessingMode.ALL,
-    val storage: PostedStorage? = null
+    val storage: PostedStorage? = null,
 ) {
     /**
      * Builder for Java callers (data class defaults don't work from Java).
@@ -32,13 +32,15 @@ data class PostedConfig(
         private var storage: PostedStorage? = null
 
         fun linkProcessingMode(value: LinkProcessingMode) = apply { linkProcessingMode = value }
+
         fun storage(value: PostedStorage) = apply { storage = value }
 
-        fun build(): PostedConfig = PostedConfig(
-            apiKey = apiKey,
-            appId = appId,
-            linkProcessingMode = linkProcessingMode,
-            storage = storage
-        )
+        fun build(): PostedConfig =
+            PostedConfig(
+                apiKey = apiKey,
+                appId = appId,
+                linkProcessingMode = linkProcessingMode,
+                storage = storage,
+            )
     }
 }

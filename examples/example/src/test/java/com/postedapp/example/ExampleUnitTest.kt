@@ -1,4 +1,4 @@
-package com.postedapp.example
+package com.postedapp.posted.example
 
 import org.junit.Test
 import org.junit.Assert.*

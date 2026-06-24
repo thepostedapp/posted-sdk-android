@@ -16,7 +16,6 @@ import kotlinx.coroutines.launch
  * and never propagate exceptions to the caller.
  */
 object PostedAnalytics {
-
     private const val TAG = "PostedAnalytics"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -33,7 +32,10 @@ object PostedAnalytics {
     /**
      * Internal — called from [com.postedapp.posted.Posted.initialize].
      */
-    internal fun initialize(config: PostedConfig, storage: PostedStorage) {
+    internal fun initialize(
+        config: PostedConfig,
+        storage: PostedStorage,
+    ) {
         apiClient = AnalyticsApiClient(config)
         deviceIdProvider = DeviceIdProvider(storage)
         isInitialized = true
@@ -47,7 +49,10 @@ object PostedAnalytics {
      */
     @JvmStatic
     @JvmOverloads
-    fun logEvent(eventName: PostedEventNames, data: Any? = null) {
+    fun logEvent(
+        eventName: PostedEventNames,
+        data: Any? = null,
+    ) {
         if (!isInitialized) {
             Log.w(TAG, "[Posted:ANALYTICS] Analytics not initialized — call Posted.initialize() first")
             return

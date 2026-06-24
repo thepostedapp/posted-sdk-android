@@ -17,18 +17,21 @@ import kotlinx.coroutines.withContext
  * - **Integration**: Match your app's existing storage solution
  */
 internal class DefaultStorageProvider(context: Context) : PostedStorage {
-
-    private val prefs: SharedPreferences = context.getSharedPreferences(
-        PREFS_NAME,
-        Context.MODE_PRIVATE
-    )
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences(
+            PREFS_NAME,
+            Context.MODE_PRIVATE,
+        )
 
     override suspend fun getItem(key: String): String? =
         withContext(Dispatchers.IO) {
             prefs.getString(key, null)
         }
 
-    override suspend fun setItem(key: String, value: String) {
+    override suspend fun setItem(
+        key: String,
+        value: String,
+    ) {
         withContext(Dispatchers.IO) {
             prefs.edit().putString(key, value).apply()
         }

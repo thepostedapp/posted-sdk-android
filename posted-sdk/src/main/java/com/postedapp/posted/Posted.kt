@@ -14,8 +14,8 @@ import com.postedapp.posted.models.LinkType
 import com.postedapp.posted.models.ShortLinkResponse
 import com.postedapp.posted.referrer.InstallReferrerHelper
 import com.postedapp.posted.storage.DefaultStorageProvider
-import com.postedapp.posted.storage.PostedStorage
 import com.postedapp.posted.storage.FirstLaunchDetector
+import com.postedapp.posted.storage.PostedStorage
 import com.postedapp.posted.utils.UrlHelpers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -50,7 +50,6 @@ import java.util.concurrent.atomic.AtomicBoolean
  * ```
  */
 object Posted {
-
     private const val TAG = "Posted"
 
     @Volatile
@@ -77,15 +76,21 @@ object Posted {
      */
     @JvmStatic
     @Synchronized
-    fun initialize(context: Context, config: PostedConfig) {
+    fun initialize(
+        context: Context,
+        config: PostedConfig,
+    ) {
         if (isInitialized) {
             Log.w(TAG, "SDK already initialized")
             return
         }
 
         if (config.apiKey.isBlank() || config.appId.isBlank()) {
-            Log.e(TAG, "[Posted] apiKey or appId is missing — SDK will not process links. " +
-                       "Set your credentials in PostedConfig.")
+            Log.e(
+                TAG,
+                "[Posted] apiKey or appId is missing — SDK will not process links. " +
+                    "Set your credentials in PostedConfig.",
+            )
             return
         }
 
@@ -126,7 +131,7 @@ object Posted {
     suspend fun processLink(intent: Intent): LinkResult {
         if (!isInitialized) {
             return LinkResult.Error(
-                IllegalStateException("posted-sdk not initialized. Call Posted.initialize() first.")
+                IllegalStateException("posted-sdk not initialized. Call Posted.initialize() first."),
             )
         }
 
@@ -170,7 +175,7 @@ object Posted {
     suspend fun getDeferredLink(): LinkResult {
         if (!isInitialized) {
             return LinkResult.Error(
-                IllegalStateException("posted-sdk not initialized. Call Posted.initialize() first.")
+                IllegalStateException("posted-sdk not initialized. Call Posted.initialize() first."),
             )
         }
 
@@ -208,7 +213,13 @@ object Posted {
         val link = uri.toString()
         val clickResult = apiClient.sendUniversalLinkClick(link, UrlHelpers.parseQueryParams(link))
         if (!clickResult.allowed) {
-            Log.e(TAG, "[Posted:CLICK_LIMIT_ERROR] Universal/App link blocked: url=$link error=${clickResult.error} code=${clickResult.code} clicksInPeriod=${clickResult.clicksInPeriod} effectiveLimit=${clickResult.effectiveLimit}")
+            Log.e(
+                TAG,
+                "[Posted:CLICK_LIMIT_ERROR] Universal/App link blocked: url=$link " +
+                    "error=${clickResult.error} code=${clickResult.code} " +
+                    "clicksInPeriod=${clickResult.clicksInPeriod} " +
+                    "effectiveLimit=${clickResult.effectiveLimit}",
+            )
             return LinkResult.NoLink
         }
 
@@ -223,7 +234,7 @@ object Posted {
                     route = route,
                     pathname = UrlHelpers.extractPathname(route),
                     type = LinkType.VERIFIED,
-                    params = UrlHelpers.parseQueryParams(shortLinkResult.link)
+                    params = UrlHelpers.parseQueryParams(shortLinkResult.link),
                 )
             }
         }
@@ -235,7 +246,7 @@ object Posted {
             route = route,
             pathname = UrlHelpers.extractPathname(route),
             type = LinkType.VERIFIED,
-            params = UrlHelpers.parseQueryParams(link)
+            params = UrlHelpers.parseQueryParams(link),
         )
     }
 
@@ -254,7 +265,7 @@ object Posted {
             route = route,
             pathname = UrlHelpers.extractPathname(route),
             type = LinkType.SCHEME,
-            params = UrlHelpers.parseQueryParams(link)
+            params = UrlHelpers.parseQueryParams(link),
         )
     }
 
@@ -281,15 +292,16 @@ object Posted {
         // Try to get click ID from install referrer (deterministic matching)
         val clickId = installReferrerHelper.getClickId()
 
-        val link: String? = if (clickId != null) {
-            Log.d(TAG, "Using deterministic matching with click_id")
-            val fingerprint = DeterministicFingerprint(clickId)
-            apiClient.matchLink(fingerprint)
-        } else {
-            Log.d(TAG, "The click_id not found, using probabilistic matching")
-            val fingerprint = fingerprintCollector.collectFingerprint()
-            apiClient.matchLink(fingerprint)
-        }
+        val link: String? =
+            if (clickId != null) {
+                Log.d(TAG, "Using deterministic matching with click_id")
+                val fingerprint = DeterministicFingerprint(clickId)
+                apiClient.matchLink(fingerprint)
+            } else {
+                Log.d(TAG, "The click_id not found, using probabilistic matching")
+                val fingerprint = fingerprintCollector.collectFingerprint()
+                apiClient.matchLink(fingerprint)
+            }
 
         if (link == null) {
             Log.d(TAG, "No deferred link matched")
@@ -305,7 +317,7 @@ object Posted {
             route = route,
             pathname = UrlHelpers.extractPathname(route),
             type = LinkType.DEFERRED,
-            params = UrlHelpers.parseQueryParams(link)
+            params = UrlHelpers.parseQueryParams(link),
         )
     }
 

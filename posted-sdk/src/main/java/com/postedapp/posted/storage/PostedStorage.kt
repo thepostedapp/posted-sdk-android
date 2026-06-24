@@ -50,7 +50,10 @@ interface PostedStorage {
      * @param key Storage key
      * @param value String value to store
      */
-    suspend fun setItem(key: String, value: String)
+    suspend fun setItem(
+        key: String,
+        value: String,
+    )
 
     /**
      * Remove a value from storage.

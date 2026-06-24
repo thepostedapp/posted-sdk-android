@@ -1,8 +1,8 @@
 package com.postedapp.posted.api
 
 import android.util.Log
-import com.postedapp.posted.PostedConfig
 import com.postedapp.posted.FlutterSdkHeaderResolver
+import com.postedapp.posted.PostedConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -21,10 +21,10 @@ internal class AnalyticsApiClient(
     private val config: PostedConfig,
     private val baseUrl: String = "https://godetour.dev",
 ) {
-
-    private val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
-        timeZone = TimeZone.getTimeZone("UTC")
-    }
+    private val isoFormat =
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
 
     /**
      * Send an analytics event.
@@ -33,10 +33,14 @@ internal class AnalyticsApiClient(
      * @param data Optional event data
      * @param deviceId Persistent device identifier
      */
-    suspend fun sendEvent(eventName: String, data: Any?, deviceId: String) =
-        withContext(Dispatchers.IO) {
-            try {
-                val payload = buildMap<String, Any?> {
+    suspend fun sendEvent(
+        eventName: String,
+        data: Any?,
+        deviceId: String,
+    ) = withContext(Dispatchers.IO) {
+        try {
+            val payload =
+                buildMap<String, Any?> {
                     put("event_name", eventName)
                     put("data", data)
                     put("timestamp", isoFormat.format(Date()))
@@ -44,10 +48,11 @@ internal class AnalyticsApiClient(
                     put("device_id", deviceId)
                 }
 
-                val json = HttpClient.gson.toJson(payload)
-                val requestBody = json.toRequestBody(HttpClient.JSON)
+            val json = HttpClient.gson.toJson(payload)
+            val requestBody = json.toRequestBody(HttpClient.JSON)
 
-                val request = Request.Builder()
+            val request =
+                Request.Builder()
                     .url(eventUrl)
                     .post(requestBody)
                     .addHeader("Content-Type", "application/json")
@@ -56,15 +61,15 @@ internal class AnalyticsApiClient(
                     .addHeader("X-SDK", FlutterSdkHeaderResolver.sdkHeaderValue)
                     .build()
 
-                HttpClient.okHttp.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) {
-                        Log.w(TAG, "[Posted:ANALYTICS] Event send failed: ${response.code}")
-                    }
+            HttpClient.okHttp.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    Log.w(TAG, "[Posted:ANALYTICS] Event send failed: ${response.code}")
                 }
-            } catch (e: Exception) {
-                Log.w(TAG, "[Posted:ANALYTICS] Event send exception", e)
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "[Posted:ANALYTICS] Event send exception", e)
         }
+    }
 
     /**
      * Send a retention event.
@@ -72,20 +77,24 @@ internal class AnalyticsApiClient(
      * @param eventName Name of the retention event
      * @param deviceId Persistent device identifier
      */
-    suspend fun sendRetentionEvent(eventName: String, deviceId: String) =
-        withContext(Dispatchers.IO) {
-            try {
-                val payload = mapOf(
+    suspend fun sendRetentionEvent(
+        eventName: String,
+        deviceId: String,
+    ) = withContext(Dispatchers.IO) {
+        try {
+            val payload =
+                mapOf(
                     "event_name" to eventName,
                     "timestamp" to isoFormat.format(Date()),
                     "platform" to "android",
-                    "device_id" to deviceId
+                    "device_id" to deviceId,
                 )
 
-                val json = HttpClient.gson.toJson(payload)
-                val requestBody = json.toRequestBody(HttpClient.JSON)
+            val json = HttpClient.gson.toJson(payload)
+            val requestBody = json.toRequestBody(HttpClient.JSON)
 
-                val request = Request.Builder()
+            val request =
+                Request.Builder()
                     .url(retentionUrl)
                     .post(requestBody)
                     .addHeader("Content-Type", "application/json")
@@ -94,15 +103,15 @@ internal class AnalyticsApiClient(
                     .addHeader("X-SDK", FlutterSdkHeaderResolver.sdkHeaderValue)
                     .build()
 
-                HttpClient.okHttp.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) {
-                        Log.w(TAG, "[Posted:ANALYTICS] Retention send failed: ${response.code}")
-                    }
+            HttpClient.okHttp.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    Log.w(TAG, "[Posted:ANALYTICS] Retention send failed: ${response.code}")
                 }
-            } catch (e: Exception) {
-                Log.w(TAG, "[Posted:ANALYTICS] Retention send exception", e)
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "[Posted:ANALYTICS] Retention send exception", e)
         }
+    }
 
     private val eventUrl get() = "$baseUrl/api/analytics/event"
     private val retentionUrl get() = "$baseUrl/api/analytics/retention"

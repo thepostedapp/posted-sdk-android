@@ -15,36 +15,36 @@ import com.postedapp.posted.storage.PostedStorage
 
 @Deprecated(
     message = "Renamed to Posted",
-    replaceWith = ReplaceWith("Posted", "com.postedapp.posted.Posted")
+    replaceWith = ReplaceWith("Posted", "com.postedapp.posted.Posted"),
 )
 typealias Detour = Posted
 
 @Deprecated(
     message = "Renamed to PostedConfig",
-    replaceWith = ReplaceWith("PostedConfig", "com.postedapp.posted.PostedConfig")
+    replaceWith = ReplaceWith("PostedConfig", "com.postedapp.posted.PostedConfig"),
 )
 typealias DetourConfig = PostedConfig
 
 @Deprecated(
     message = "Renamed to PostedDelegate",
-    replaceWith = ReplaceWith("PostedDelegate", "com.postedapp.posted.PostedDelegate")
+    replaceWith = ReplaceWith("PostedDelegate", "com.postedapp.posted.PostedDelegate"),
 )
 typealias DetourDelegate = PostedDelegate
 
 @Deprecated(
     message = "Renamed to PostedStorage",
-    replaceWith = ReplaceWith("PostedStorage", "com.postedapp.posted.storage.PostedStorage")
+    replaceWith = ReplaceWith("PostedStorage", "com.postedapp.posted.storage.PostedStorage"),
 )
 typealias DetourStorage = PostedStorage
 
 @Deprecated(
     message = "Renamed to PostedAnalytics",
-    replaceWith = ReplaceWith("PostedAnalytics", "com.postedapp.posted.analytics.PostedAnalytics")
+    replaceWith = ReplaceWith("PostedAnalytics", "com.postedapp.posted.analytics.PostedAnalytics"),
 )
 typealias DetourAnalytics = PostedAnalytics
 
 @Deprecated(
     message = "Renamed to PostedEventNames",
-    replaceWith = ReplaceWith("PostedEventNames", "com.postedapp.posted.analytics.PostedEventNames")
+    replaceWith = ReplaceWith("PostedEventNames", "com.postedapp.posted.analytics.PostedEventNames"),
 )
 typealias DetourEventNames = PostedEventNames

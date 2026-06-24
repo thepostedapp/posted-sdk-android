@@ -32,7 +32,6 @@ import org.robolectric.RuntimeEnvironment
  */
 @RunWith(RobolectricTestRunner::class)
 class ContractConformanceTest {
-
     private lateinit var server: MockWebServer
     private lateinit var context: Context
     private lateinit var config: PostedConfig
@@ -183,17 +182,22 @@ class ContractConformanceTest {
         assertEquals(FlutterSdkHeaderResolver.sdkHeaderValue, req.getHeader("X-SDK"))
     }
 
-    private fun assertSchema(json: String, schemaFileName: String) {
-        val errors: Set<ValidationMessage> = loadSchema(schemaFileName).validate(
-            OBJECT_MAPPER.readTree(json)
-        )
+    private fun assertSchema(
+        json: String,
+        schemaFileName: String,
+    ) {
+        val errors: Set<ValidationMessage> =
+            loadSchema(schemaFileName).validate(
+                OBJECT_MAPPER.readTree(json),
+            )
         assertTrue("Schema '$schemaFileName' violations for body $json — errors: $errors", errors.isEmpty())
     }
 
-    private fun loadSchema(name: String) = SCHEMA_FACTORY.getSchema(
-        javaClass.classLoader!!.getResourceAsStream("fixtures/$name.json")
-            ?: error("Missing test fixture: fixtures/$name.json")
-    )
+    private fun loadSchema(name: String) =
+        SCHEMA_FACTORY.getSchema(
+            javaClass.classLoader!!.getResourceAsStream("fixtures/$name.json")
+                ?: error("Missing test fixture: fixtures/$name.json"),
+        )
 
     companion object {
         private const val TEST_API_KEY = "test-bearer-key"

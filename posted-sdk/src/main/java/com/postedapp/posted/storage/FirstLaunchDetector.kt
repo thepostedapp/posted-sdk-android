@@ -6,7 +6,6 @@ package com.postedapp.posted.storage
  * Storage key used: `Posted_firstEntranceFlag`
  */
 internal class FirstLaunchDetector(private val storage: PostedStorage) {
-
     /**
      * Check if this is the first app launch.
      */
