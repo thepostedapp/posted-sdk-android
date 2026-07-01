@@ -23,7 +23,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Main entry point for the posted-sdk SDK.
@@ -37,15 +36,14 @@ import java.util.concurrent.atomic.AtomicBoolean
  * )
  * Posted.initialize(context, config)
  *
- * // Process any link (Verified, Scheme, or Deferred) in onCreate()
+ * // Resolve attribution for this launch (fire-once, cached across installs)
  * lifecycleScope.launch {
- *     when (val result = Posted.processLink(intent)) {
+ *     when (val result = Posted.resolveAppLaunch(intent)) {
  *         is LinkResult.Success -> {
  *             // Navigate to result.route
  *             // Access result.params, result.pathname, result.type
  *         }
  *         is LinkResult.NoLink -> { /* Normal app launch */ }
- *         is LinkResult.NotFirstLaunch -> { /* Already processed deferred link */ }
  *         is LinkResult.Error -> { /* Handle error */ }
  *     }
  * }
@@ -56,8 +54,6 @@ object Posted {
 
     @Volatile
     private var isInitialized = false
-
-    private val sessionHandled = AtomicBoolean(false)
 
     private val migrationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -72,7 +68,7 @@ object Posted {
 
     /**
      * Initialize the posted-sdk SDK.
-     * Call this once in Application.onCreate() or before using processLink() or getDeferredLink().
+     * Call this once in Application.onCreate() or before using resolveAppLaunch().
      *
      * @param context Application or Activity context
      * @param config posted-sdk configuration
@@ -118,80 +114,6 @@ object Posted {
     }
 
     /**
-     * Process intent and extract deep link.
-     * Automatically detects link type (Universal, Scheme, or Deferred) and returns appropriate result.
-     *
-     * Priority order:
-     * 1. Universal App Link (if intent contains ACTION_VIEW with http/https data)
-     * 2. Scheme Link (if intent contains ACTION_VIEW with custom scheme and mode is ALL)
-     * 3. Deferred Deep Link (API call, only on first launch)
-     *
-     * In [LinkProcessingMode.DEFERRED_ONLY] mode, steps 1-2 are skipped entirely.
-     *
-     * @param intent Activity intent to process
-     * @return LinkResult with link data or status
-     */
-    @JvmStatic
-    suspend fun processLink(intent: Intent): LinkResult {
-        if (!isInitialized) {
-            return LinkResult.Error(
-                IllegalStateException("posted-sdk not initialized. Call Posted.initialize() first."),
-            )
-        }
-
-        return try {
-            // Step 1: Try to extract link from intent (unless DEFERRED_ONLY)
-            if (config.linkProcessingMode != LinkProcessingMode.DEFERRED_ONLY) {
-                if (intent.action == Intent.ACTION_VIEW && intent.data != null) {
-                    val uri = intent.data!!
-                    val uriString = uri.toString()
-
-                    if (UrlHelpers.isWebUrl(uriString)) {
-                        // Mark first entrance so subsequent launches don't try deferred matching
-                        firstLaunchDetector.markAsLaunched()
-                        return processUniversalLink(uri)
-                    }
-
-                    if (config.linkProcessingMode == LinkProcessingMode.ALL) {
-                        return processSchemeLink(uri)
-                    }
-                }
-            }
-
-            // Step 2: Fallback to deferred link
-            processDeferredLink()
-        } catch (e: Exception) {
-            Log.e(TAG, "[Posted:RUNTIME_ERROR] Error processing link", e)
-            LinkResult.Error(e)
-        }
-    }
-
-    /**
-     * Get deferred link only (ignore Universal/Scheme Links).
-     * Use this if you want to handle other link types separately.
-     *
-     * This should be called once per app session, typically in your main Activity.
-     * The function is idempotent - multiple calls in the same session will return NotFirstLaunch.
-     *
-     * @return LinkResult.Success with DEFERRED type, or NotFirstLaunch/NoLink/Error
-     */
-    @JvmStatic
-    suspend fun getDeferredLink(): LinkResult {
-        if (!isInitialized) {
-            return LinkResult.Error(
-                IllegalStateException("posted-sdk not initialized. Call Posted.initialize() first."),
-            )
-        }
-
-        return try {
-            processDeferredLink()
-        } catch (e: Exception) {
-            Log.e(TAG, "[Posted:RUNTIME_ERROR] Error processing deferred link", e)
-            LinkResult.Error(e)
-        }
-    }
-
-    /**
      * Resolve attribution for this app launch. Fire-once per install: the first call makes one
      * network request and caches the result; all subsequent calls (including across app restarts
      * and updates) return the cached [LinkResult] without any network call.
@@ -228,7 +150,7 @@ object Posted {
 
     /**
      * Re-arm the fire-once gate so the next [resolveAppLaunch] call performs a fresh network
-     * resolution. Also resets the in-session dedup guard used by [processLink]/[getDeferredLink].
+     * resolution.
      *
      * Typical use: test harnesses, QA re-installs, or user account reset flows.
      */
@@ -238,23 +160,77 @@ object Posted {
             Log.w(TAG, "SDK not initialized. Call Posted.initialize() first.")
             return
         }
-        sessionHandled.set(false)
         runBlocking { attributionCache.clear() }
     }
 
+    // ── Deprecated shims (kept one cycle) ────────────────────────────────────
+
     /**
-     * Resolve a short link URL to its full link data.
-     *
-     * @param url The short link URL to resolve
-     * @return ShortLinkResponse or null on 404/error
+     * @deprecated Use [resolveAppLaunch] instead.
      */
+    @Deprecated(
+        message = "Use resolveAppLaunch instead",
+        replaceWith = ReplaceWith("resolveAppLaunch(intent)"),
+    )
+    @JvmStatic
+    suspend fun resolveInitialLink(intent: Intent): LinkResult {
+        Log.w(TAG, "[Posted] resolveInitialLink(intent) is deprecated. Use resolveAppLaunch(intent) instead.")
+        return resolveAppLaunch(intent)
+    }
+
+    /**
+     * @deprecated Use [resolveAppLaunch] instead.
+     */
+    @Deprecated(
+        message = "Use resolveAppLaunch instead",
+        replaceWith = ReplaceWith("resolveAppLaunch()"),
+    )
+    @JvmStatic
+    suspend fun resolveInitialLink(): LinkResult {
+        Log.w(TAG, "[Posted] resolveInitialLink() is deprecated. Use resolveAppLaunch() instead.")
+        return resolveAppLaunch(null)
+    }
+
+    /**
+     * @deprecated Use [resolveAppLaunch] instead.
+     */
+    @Deprecated(
+        message = "Use resolveAppLaunch instead",
+        replaceWith = ReplaceWith("resolveAppLaunch(intent)"),
+    )
+    @JvmStatic
+    suspend fun processLink(intent: Intent): LinkResult {
+        Log.w(TAG, "[Posted] processLink() is deprecated. Use resolveAppLaunch(intent) instead.")
+        return resolveAppLaunch(intent)
+    }
+
+    /**
+     * @deprecated Use [resolveAppLaunch] instead.
+     */
+    @Deprecated(
+        message = "Use resolveAppLaunch instead",
+        replaceWith = ReplaceWith("resolveAppLaunch()"),
+    )
+    @JvmStatic
+    suspend fun getDeferredLink(): LinkResult {
+        Log.w(TAG, "[Posted] getDeferredLink() is deprecated. Use resolveAppLaunch() instead.")
+        return resolveAppLaunch(null)
+    }
+
+    /**
+     * @deprecated resolveShortLink is for internal use only. Use [resolveAppLaunch] for link resolution.
+     */
+    @Deprecated(
+        message = "resolveShortLink is for internal use only. Use resolveAppLaunch for link resolution.",
+        replaceWith = ReplaceWith("resolveAppLaunch(intent)"),
+    )
     @JvmStatic
     suspend fun resolveShortLink(url: String): ShortLinkResponse? {
+        Log.w(TAG, "[Posted] resolveShortLink() is deprecated. Use resolveAppLaunch() for link resolution.")
         if (!isInitialized) {
             Log.w(TAG, "SDK not initialized. Call Posted.initialize() first.")
             return null
         }
-
         return apiClient.resolveShortLink(url)
     }
 
@@ -362,58 +338,6 @@ object Posted {
         if (link == null) return LinkResult.NoLink
 
         val route = UrlHelpers.parseRoute(link) ?: "/"
-        return LinkResult.Success(
-            url = link,
-            route = route,
-            pathname = UrlHelpers.extractPathname(route),
-            type = LinkType.DEFERRED,
-            params = UrlHelpers.parseQueryParams(link),
-        )
-    }
-
-    /**
-     * Process Deferred Deep Link via API.
-     */
-    private suspend fun processDeferredLink(): LinkResult {
-        // Prevent duplicate API calls in same session (atomic guard).
-        if (!sessionHandled.compareAndSet(false, true)) {
-            Log.d(TAG, "Session already handled")
-            return LinkResult.NotFirstLaunch
-        }
-
-        // Check if first launch
-        if (!firstLaunchDetector.isFirstLaunch()) {
-            Log.d(TAG, "Not first launch")
-            return LinkResult.NotFirstLaunch
-        }
-
-        // Mark as launched
-        firstLaunchDetector.markAsLaunched()
-        Log.d(TAG, "First launch detected, processing deferred link")
-
-        // Try to get click ID from install referrer (deterministic matching)
-        val clickId = installReferrerHelper.getClickId()
-
-        val link: String? =
-            if (clickId != null) {
-                Log.d(TAG, "Using deterministic matching with click_id")
-                val fingerprint = DeterministicFingerprint(clickId)
-                apiClient.matchLink(fingerprint)
-            } else {
-                Log.d(TAG, "The click_id not found, using probabilistic matching")
-                val fingerprint = fingerprintCollector.collectFingerprint()
-                apiClient.matchLink(fingerprint)
-            }
-
-        if (link == null) {
-            Log.d(TAG, "No deferred link matched")
-            return LinkResult.NoLink
-        }
-
-        // Parse route from link (strips app hash, extracts path)
-        val route = UrlHelpers.parseRoute(link) ?: "/"
-
-        Log.d(TAG, "Deferred link matched successfully")
         return LinkResult.Success(
             url = link,
             route = route,
