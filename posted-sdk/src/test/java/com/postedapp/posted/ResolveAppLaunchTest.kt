@@ -50,17 +50,34 @@ class ResolveAppLaunchTest {
     @Test
     fun `link-present branch - universal link click + short-link resolved`() =
         runTest {
-            // resolve-short returns the full link
-            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/product"}"""))
-            // universal-link-click succeeds
+            // click fires first, then resolve-short
             server.enqueue(MockResponse().setResponseCode(200).setBody("""{"allowed":true}"""))
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/product"}"""))
 
-            val intent = linkIntent("https://godetour.dev/x9Az")
+            // Use the mock server's own host so the short-link domain gate passes
+            val shortLinkUrl = server.url("/x9Az").toString()
+            val intent = linkIntent(shortLinkUrl)
             val result = Posted.resolveAppLaunch(intent)
 
             assertTrue(result is LinkResult.Success)
             assertEquals(LinkType.VERIFIED, (result as LinkResult.Success).type)
+            assertEquals("https://example.com/product", result.url)
+            assertEquals(2, server.requestCount)
             assertTrue(storage.getItem(StorageKeys.ATTRIBUTION_RESOLVED) == "true")
+        }
+
+    @Test
+    fun `link-present branch - single-segment non-short-link host skips resolveShortLink`() =
+        runTest {
+            // Only one response needed: the click. The domain gate must prevent the probe.
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"allowed":true}"""))
+
+            val intent = linkIntent("https://example.com/abc")
+            val result = Posted.resolveAppLaunch(intent)
+
+            assertTrue(result is LinkResult.Success)
+            assertEquals(1, server.requestCount)
+            assertEquals("https://example.com/abc", result.url)
         }
 
     @Test

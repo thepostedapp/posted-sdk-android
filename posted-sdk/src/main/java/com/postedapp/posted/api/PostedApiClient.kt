@@ -1,6 +1,7 @@
 package com.postedapp.posted.api
 
 import android.content.Context
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import com.postedapp.posted.FlutterSdkHeaderResolver
@@ -205,6 +206,13 @@ internal class PostedApiClient(
             "app_version" to appVersion,
             "device_model" to Build.MODEL,
         )
+    }
+
+    /** True when [host] is the same host as [baseUrl] (the known short-link domain). */
+    internal fun isKnownShortLinkHost(host: String): Boolean {
+        if (host.isBlank()) return false
+        val baseHost = Uri.parse(baseUrl).host ?: return false
+        return host.equals(baseHost, ignoreCase = true)
     }
 
     private val matchLinkUrl get() = "$baseUrl/api/link/match-link"
