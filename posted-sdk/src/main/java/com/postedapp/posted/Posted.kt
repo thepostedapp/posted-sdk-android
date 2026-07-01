@@ -22,6 +22,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -238,7 +239,7 @@ object Posted {
             return
         }
         sessionHandled.set(false)
-        migrationScope.launch { attributionCache.clear() }
+        runBlocking { attributionCache.clear() }
     }
 
     /**

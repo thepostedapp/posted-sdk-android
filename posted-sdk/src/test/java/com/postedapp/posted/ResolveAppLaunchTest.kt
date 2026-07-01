@@ -145,9 +145,6 @@ class ResolveAppLaunchTest {
 
             Posted.resetSession()
 
-            // Wait for the async clear to complete (migrationScope is IO)
-            kotlinx.coroutines.delay(100)
-
             server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/new"}"""))
             val rearmed = Posted.resolveAppLaunch(null)
             assertTrue(rearmed is LinkResult.Success)
