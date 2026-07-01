@@ -18,7 +18,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
-import java.lang.reflect.Field
 
 /**
  * Integration tests for [Posted.resolveAppLaunch] covering:
@@ -160,14 +159,13 @@ class ResolveAppLaunchTest {
         val base = server.url("/").toString().trimEnd('/')
 
         // Use reflection to inject test config pointing at MockWebServer
-        val configField: Field = Posted::class.java.getDeclaredField("config")
-        val apiClientField: Field = Posted::class.java.getDeclaredField("apiClient")
-        val storageField: Field = Posted::class.java.getDeclaredField("storage")
-        val attributionCacheField: Field = Posted::class.java.getDeclaredField("attributionCache")
-        val isInitField: Field = Posted::class.java.getDeclaredField("isInitialized")
-        val sessionHandledField: Field = Posted::class.java.getDeclaredField("sessionHandled")
+        val configField = Posted::class.java.getDeclaredField("config")
+        val apiClientField = Posted::class.java.getDeclaredField("apiClient")
+        val storageField = Posted::class.java.getDeclaredField("storage")
+        val attributionCacheField = Posted::class.java.getDeclaredField("attributionCache")
+        val isInitField = Posted::class.java.getDeclaredField("isInitialized")
 
-        for (f in listOf(configField, apiClientField, storageField, attributionCacheField, isInitField, sessionHandledField)) {
+        for (f in listOf(configField, apiClientField, storageField, attributionCacheField, isInitField)) {
             f.isAccessible = true
         }
 
@@ -179,7 +177,6 @@ class ResolveAppLaunchTest {
         storageField.set(Posted, storage)
         attributionCacheField.set(Posted, AttributionCache(storage))
         isInitField.set(Posted, true)
-        (sessionHandledField.get(Posted) as java.util.concurrent.atomic.AtomicBoolean).set(false)
 
         // Wire up remaining components that resolveAppLaunch needs
         val fingerprintField = Posted::class.java.getDeclaredField("fingerprintCollector")
@@ -195,10 +192,6 @@ class ResolveAppLaunchTest {
         val isInitField = Posted::class.java.getDeclaredField("isInitialized")
         isInitField.isAccessible = true
         isInitField.set(Posted, false)
-
-        val sessionHandledField = Posted::class.java.getDeclaredField("sessionHandled")
-        sessionHandledField.isAccessible = true
-        (sessionHandledField.get(Posted) as java.util.concurrent.atomic.AtomicBoolean).set(false)
 
         storage.clear()
     }

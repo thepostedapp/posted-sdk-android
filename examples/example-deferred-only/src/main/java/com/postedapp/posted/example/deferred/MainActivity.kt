@@ -16,7 +16,7 @@ import com.postedapp.posted.example.deferred.BuildConfig
 import kotlinx.coroutines.launch
 
 /**
- * Deferred-only example: calls [Posted.getDeferredLink] directly without [com.postedapp.posted.PostedDelegate].
+ * Deferred-only example: calls [Posted.resolveAppLaunch] directly without [com.postedapp.posted.PostedDelegate].
  *
  * This is the pattern for apps where a navigation framework (Jetpack Navigation, etc.)
  * already handles Verified App Links and custom scheme links, and posted-sdk is only needed
@@ -25,11 +25,11 @@ import kotlinx.coroutines.launch
  * Key differences from the full example:
  * - [LinkProcessingMode.DEFERRED_ONLY] — SDK skips intent processing entirely.
  * - No [com.postedapp.posted.PostedDelegate] — no [onNewIntent] wiring needed.
- * - [Posted.getDeferredLink] called directly instead of [Posted.processLink].
+ * - [Posted.resolveAppLaunch] called directly instead of [Posted.getDeferredLink].
  * - No Verified App Link or custom scheme intent-filters in AndroidManifest.xml.
  *
  * Splash screen pattern:
- * The splash screen stays visible while [Posted.getDeferredLink] resolves.
+ * The splash screen stays visible while [Posted.resolveAppLaunch] resolves.
  * On success the user is taken directly to [DeepLinkDestinationActivity] — MainActivity
  * is finished immediately so the user never sees it. On no link the splash dismisses
  * normally and the home screen is shown.
@@ -62,7 +62,7 @@ class MainActivity : AppCompatActivity() {
         )
 
         lifecycleScope.launch {
-            val result = Posted.getDeferredLink()
+            val result = Posted.resolveAppLaunch()
             handleResult(result)
         }
 

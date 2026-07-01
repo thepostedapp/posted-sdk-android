@@ -61,7 +61,7 @@ class PostedDelegate(
      */
     fun onCreate(intent: Intent) {
         lifecycleOwner.lifecycleScope.launch {
-            val result = Posted.processLink(intent)
+            val result = Posted.resolveAppLaunch(intent)
             onLinkResult(result)
         }
     }
@@ -73,7 +73,7 @@ class PostedDelegate(
      */
     fun onNewIntent(intent: Intent) {
         lifecycleOwner.lifecycleScope.launch {
-            val result = Posted.processLink(intent)
+            val result = Posted.resolveAppLaunch(intent)
             onLinkResult(result)
         }
     }
