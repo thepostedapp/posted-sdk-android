@@ -13,6 +13,7 @@ import com.postedapp.posted.models.LinkResult
 import com.postedapp.posted.models.LinkType
 import com.postedapp.posted.models.ShortLinkResponse
 import com.postedapp.posted.referrer.InstallReferrerHelper
+import com.postedapp.posted.storage.AttributionCache
 import com.postedapp.posted.storage.DefaultStorageProvider
 import com.postedapp.posted.storage.FirstLaunchDetector
 import com.postedapp.posted.storage.PostedStorage
@@ -66,6 +67,7 @@ object Posted {
     private lateinit var fingerprintCollector: FingerprintCollector
     private lateinit var installReferrerHelper: InstallReferrerHelper
     private lateinit var firstLaunchDetector: FirstLaunchDetector
+    private lateinit var attributionCache: AttributionCache
 
     /**
      * Initialize the posted-sdk SDK.
@@ -101,6 +103,7 @@ object Posted {
         this.fingerprintCollector = FingerprintCollector(context.applicationContext)
         this.installReferrerHelper = InstallReferrerHelper(context.applicationContext)
         this.firstLaunchDetector = FirstLaunchDetector(this.storage)
+        this.attributionCache = AttributionCache(this.storage)
 
         // One-time migration of SharedPreferences keys from Detour_ prefix to Posted_ prefix
         migrationScope.launch { migrateStorageKeysIfNeeded() }
@@ -188,6 +191,57 @@ object Posted {
     }
 
     /**
+     * Resolve attribution for this app launch. Fire-once per install: the first call makes one
+     * network request and caches the result; all subsequent calls (including across app restarts
+     * and updates) return the cached [LinkResult] without any network call.
+     *
+     * Two-branch dispatch:
+     * - LINK-PRESENT: [intent] carries ACTION_VIEW with an http/https URL →
+     *   resolve-short / universal-link-click path (same as [processLink]).
+     * - DEFERRED: null [intent] or no link URL → match-link with device fingerprint.
+     *
+     * Cache re-arms on app reinstall (OS clears storage) or explicit [resetSession].
+     *
+     * @param intent Activity intent ([Activity.getIntent] or [Activity.onNewIntent]).
+     *               Pass null for deferred-only (background / cold-start without a link).
+     * @return [LinkResult] — same shape as today; never throws.
+     */
+    @JvmStatic
+    suspend fun resolveAppLaunch(intent: Intent? = null): LinkResult {
+        if (!isInitialized) {
+            return LinkResult.Error(
+                IllegalStateException("posted-sdk not initialized. Call Posted.initialize() first."),
+            )
+        }
+
+        return try {
+            if (attributionCache.isResolved()) {
+                return attributionCache.loadResult() ?: resolveAndCache(intent)
+            }
+            resolveAndCache(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "[Posted:RUNTIME_ERROR] Error in resolveAppLaunch", e)
+            LinkResult.Error(e)
+        }
+    }
+
+    /**
+     * Re-arm the fire-once gate so the next [resolveAppLaunch] call performs a fresh network
+     * resolution. Also resets the in-session dedup guard used by [processLink]/[getDeferredLink].
+     *
+     * Typical use: test harnesses, QA re-installs, or user account reset flows.
+     */
+    @JvmStatic
+    fun resetSession() {
+        if (!isInitialized) {
+            Log.w(TAG, "SDK not initialized. Call Posted.initialize() first.")
+            return
+        }
+        sessionHandled.set(false)
+        migrationScope.launch { attributionCache.clear() }
+    }
+
+    /**
      * Resolve a short link URL to its full link data.
      *
      * @param url The short link URL to resolve
@@ -265,6 +319,53 @@ object Posted {
             route = route,
             pathname = UrlHelpers.extractPathname(route),
             type = LinkType.SCHEME,
+            params = UrlHelpers.parseQueryParams(link),
+        )
+    }
+
+    private suspend fun resolveAndCache(intent: Intent?): LinkResult {
+        val result = dispatchResolution(intent)
+        if (result !is LinkResult.Error) {
+            attributionCache.saveResult(result)
+        }
+        return result
+    }
+
+    private suspend fun dispatchResolution(intent: Intent?): LinkResult {
+        val uri =
+            if (intent?.action == Intent.ACTION_VIEW) intent.data else null
+
+        return when {
+            uri != null && UrlHelpers.isWebUrl(uri.toString()) -> {
+                firstLaunchDetector.markAsLaunched()
+                processUniversalLink(uri)
+            }
+            uri != null && config.linkProcessingMode == LinkProcessingMode.ALL -> {
+                firstLaunchDetector.markAsLaunched()
+                processSchemeLink(uri)
+            }
+            else -> resolveDeferredAttribution()
+        }
+    }
+
+    private suspend fun resolveDeferredAttribution(): LinkResult {
+        firstLaunchDetector.markAsLaunched()
+        val clickId = installReferrerHelper.getClickId()
+        val link: String? =
+            if (clickId != null) {
+                apiClient.matchLink(DeterministicFingerprint(clickId))
+            } else {
+                apiClient.matchLink(fingerprintCollector.collectFingerprint())
+            }
+
+        if (link == null) return LinkResult.NoLink
+
+        val route = UrlHelpers.parseRoute(link) ?: "/"
+        return LinkResult.Success(
+            url = link,
+            route = route,
+            pathname = UrlHelpers.extractPathname(route),
+            type = LinkType.DEFERRED,
             params = UrlHelpers.parseQueryParams(link),
         )
     }
