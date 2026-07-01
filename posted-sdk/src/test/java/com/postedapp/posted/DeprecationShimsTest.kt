@@ -97,8 +97,10 @@ class DeprecationShimsTest {
         runTest {
             server.enqueue(MockResponse().setResponseCode(200).setBody("""{"allowed":true}"""))
 
-            Posted.processLink(linkIntent("https://example.com/a"))
-            val second = Posted.processLink(linkIntent("https://example.com/b"))
+            // Multi-segment path avoids short-link resolution (which needs a second request);
+            // fire-once semantics are what's under test here.
+            Posted.processLink(linkIntent("https://example.com/promo/launch"))
+            val second = Posted.processLink(linkIntent("https://example.com/promo/other"))
 
             // Fire-once: second call returns cached result, no new request
             assertEquals(1, server.requestCount)
