@@ -75,9 +75,9 @@ class ResolveAppLaunchTest {
             val intent = linkIntent("https://example.com/abc")
             val result = Posted.resolveAppLaunch(intent)
 
-            assertTrue(result is LinkResult.Success)
+            val success = result as LinkResult.Success
             assertEquals(1, server.requestCount)
-            assertEquals("https://example.com/abc", result.url)
+            assertEquals("https://example.com/abc", success.url)
         }
 
     @Test
