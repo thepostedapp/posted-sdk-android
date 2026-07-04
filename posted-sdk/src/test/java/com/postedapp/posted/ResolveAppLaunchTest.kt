@@ -2,8 +2,10 @@ package com.postedapp.posted
 
 import android.content.Intent
 import android.net.Uri
+import com.google.gson.JsonParser
 import com.postedapp.posted.models.LinkResult
 import com.postedapp.posted.models.LinkType
+import com.postedapp.posted.referrer.InstallReferrerHelper
 import com.postedapp.posted.storage.AttributionCache
 import com.postedapp.posted.storage.StorageKeys
 import com.postedapp.posted.test.InMemoryStorage
@@ -12,6 +14,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -120,6 +123,48 @@ class ResolveAppLaunchTest {
             assertTrue(storage.getItem(StorageKeys.ATTRIBUTION_RESOLVED) == "true")
         }
 
+    // ── DEFERRED branch — deterministic handoff (POS-228 / E1) ────────────────
+
+    @Test
+    fun `deferred branch - install-referrer click_id sends deterministic match-link and bypasses probabilistic scoring`() =
+        runTest {
+            // A click-through carried click_id in the Play install-referrer.
+            injectReferrerHelper(clickId = "abc-click-123")
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/app/deterministic"}"""))
+
+            val result = Posted.resolveAppLaunch(null)
+
+            assertTrue(result is LinkResult.Success)
+            assertEquals(LinkType.DEFERRED, (result as LinkResult.Success).type)
+            assertEquals("https://example.com/app/deterministic", result.url)
+
+            // Body must be the deterministic fingerprint: only clickId, no probabilistic signals.
+            val req = server.takeRequest()
+            assertEquals("/api/link/match-link", req.path)
+            val json = JsonParser.parseString(req.body.readUtf8()).asJsonObject
+            assertEquals("abc-click-123", json.get("clickId").asString)
+            assertFalse("deterministic handoff must not carry platform", json.has("platform"))
+            assertFalse("deterministic handoff must not carry screenWidth", json.has("screenWidth"))
+        }
+
+    @Test
+    fun `deferred branch - absent install-referrer falls back to probabilistic fingerprint`() =
+        runTest {
+            // No click-through: install-referrer carries no click_id.
+            injectReferrerHelper(clickId = null)
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/app/probabilistic"}"""))
+
+            val result = Posted.resolveAppLaunch(null)
+
+            assertTrue(result is LinkResult.Success)
+
+            val req = server.takeRequest()
+            assertEquals("/api/link/match-link", req.path)
+            val json = JsonParser.parseString(req.body.readUtf8()).asJsonObject
+            assertFalse("probabilistic fallback must not carry clickId", json.has("clickId"))
+            assertTrue("probabilistic fingerprint must carry platform", json.has("platform"))
+        }
+
     // ── Cache short-circuit ──────────────────────────────────────────────────
 
     @Test
@@ -203,6 +248,21 @@ class ResolveAppLaunchTest {
         fingerprintField.set(Posted, com.postedapp.posted.fingerprint.FingerprintCollector(context))
         referrerField.set(Posted, com.postedapp.posted.referrer.InstallReferrerHelper(context))
         firstLaunchField.set(Posted, com.postedapp.posted.storage.FirstLaunchDetector(storage))
+    }
+
+    /**
+     * Replace the injected [InstallReferrerHelper] with a fake returning a fixed [clickId],
+     * simulating (or not) a click-through that carried `click_id` in the Play install-referrer.
+     */
+    private fun injectReferrerHelper(clickId: String?) {
+        val context = RuntimeEnvironment.getApplication()
+        val fake =
+            object : InstallReferrerHelper(context) {
+                override suspend fun getClickId(): String? = clickId
+            }
+        val referrerField = Posted::class.java.getDeclaredField("installReferrerHelper")
+        referrerField.isAccessible = true
+        referrerField.set(Posted, fake)
     }
 
     private fun resetPostedSingleton() {

@@ -13,13 +13,17 @@ import kotlin.coroutines.resume
 
 /**
  * Helper for retrieving install referrer information.
+ *
+ * Open for test doubles: the Play [InstallReferrerClient] cannot be exercised under
+ * Robolectric, so tests inject a subclass overriding [getClickId] to simulate a
+ * click-through carrying `click_id` (deterministic handoff, POS-228).
  */
-internal class InstallReferrerHelper(private val context: Context) {
+internal open class InstallReferrerHelper(private val context: Context) {
     /**
      * Get click ID from install referrer if available.
      * Returns null if not available or on error.
      */
-    suspend fun getClickId(): String? =
+    open suspend fun getClickId(): String? =
         withContext(Dispatchers.IO) {
             try {
                 val referrerUrl = getInstallReferrer() ?: return@withContext null
