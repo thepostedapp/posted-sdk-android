@@ -254,8 +254,8 @@ object Posted {
             return LinkResult.NoLink
         }
 
-        // Short link resolution: single-segment path indicates a short link
-        if (UrlHelpers.isSingleSegmentPath(uri)) {
+        // Short link resolution: single-segment path on the known short-link host
+        if (UrlHelpers.isSingleSegmentPath(uri) && apiClient.isKnownShortLinkHost(uri.host.orEmpty())) {
             val shortLinkResult = apiClient.resolveShortLink(link)
             if (shortLinkResult?.link != null) {
                 Log.d(TAG, "Short link resolved successfully")
