@@ -8,7 +8,7 @@ Add the SDK to your `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.postedapp:posted-sdk:2.0.0")
+    implementation("com.postedapp:posted-sdk:3.0.0")
 }
 ```
 
@@ -141,6 +141,21 @@ val config = PostedConfig(
 </details>
 
 Use `DEFERRED_ONLY` when your navigation framework already handles App Links and scheme links — this prevents double-processing.
+
+### The `posted://` scheme
+
+`posted://` is the SDK's canonical custom URL scheme. Register it on the activity that hosts your `PostedDelegate` so that `posted://…` links open your app and are resolved by the SDK, alongside the deterministic install-referrer flow used for deferred links:
+
+```xml
+<intent-filter>
+  <action android:name="android.intent.action.VIEW" />
+  <category android:name="android.intent.category.DEFAULT" />
+  <category android:name="android.intent.category.BROWSABLE" />
+  <data android:scheme="posted" />
+</intent-filter>
+```
+
+`posted://` links are processed like any other custom scheme link (`LinkType.SCHEME`) and require `linkProcessingMode = ALL`. You can register your own app-specific scheme in the same manifest in addition to `posted://`. Registering `posted://` does **not** affect deferred-link attribution, which relies on the install referrer and works with no intent-filter at all.
 
 ### Custom storage
 
