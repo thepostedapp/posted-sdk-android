@@ -6,7 +6,7 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
-version = "2.0.0"
+version = "3.0.0"
 val sdkVersion = project.version.toString()
 
 android {
@@ -75,7 +75,7 @@ mavenPublishing {
     pom {
         name = "posted-sdk Android"
         description = "SDK for handling deferred deep links on Android."
-        url = "https://github.com/thepostedapp/android-detour"
+        url = "https://github.com/thepostedapp/posted-sdk-android"
         licenses {
             license {
                 name = "The MIT License"
@@ -83,15 +83,15 @@ mavenPublishing {
             }
         }
         scm {
-            connection = "scm:git:git://github.com/thepostedapp/android-detour.git"
-            developerConnection = "scm:git:ssh://github.com/thepostedapp/android-detour.git"
-            url = "https://github.com/thepostedapp/android-detour"
+            connection = "scm:git:git://github.com/thepostedapp/posted-sdk-android.git"
+            developerConnection = "scm:git:ssh://github.com/thepostedapp/posted-sdk-android.git"
+            url = "https://github.com/thepostedapp/posted-sdk-android"
         }
         developers {
             developer {
                 id = "postedapp"
                 name = "Posted"
-                email = "hi@postedapp.com"
+                email = "yuriy@postedapp.com"
             }
         }
     }

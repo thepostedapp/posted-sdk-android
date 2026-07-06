@@ -40,11 +40,17 @@ This example demonstrates a full integration of `com.postedapp:posted-sdk` using
      com.postedapp.posted.example
    ```
    - Same navigation result but type shows `SCHEME`. A `ReEngage` event with `source=scheme` is logged.
+   The canonical `posted://` scheme is also registered and behaves identically:
+   ```shell
+   adb shell am start -a android.intent.action.VIEW \
+     -d "posted://products/42" \
+     com.postedapp.posted.example
+   ```
 5) For deferred link testing: uninstall the app, copy a posted-sdk link from the Dashboard, then install and launch — the deferred link should resolve on first open and a `ReEngage` event with `source=deferred` is logged.
 
 ## Custom scheme links
 
-The `posted-example-app://` scheme is registered in `AndroidManifest.xml`:
+Two custom schemes are registered in `AndroidManifest.xml`: the app-specific `posted-example-app://` and the SDK's canonical `posted://` scheme:
 
 ```xml
 <intent-filter>
@@ -53,11 +59,17 @@ The `posted-example-app://` scheme is registered in `AndroidManifest.xml`:
   <category android:name="android.intent.category.BROWSABLE" />
   <data android:scheme="posted-example-app" />
 </intent-filter>
+<intent-filter>
+  <action android:name="android.intent.action.VIEW" />
+  <category android:name="android.intent.category.DEFAULT" />
+  <category android:name="android.intent.category.BROWSABLE" />
+  <data android:scheme="posted" />
+</intent-filter>
 ```
 
-The SDK parses the URI as `/<host><path>` — so `posted-example-app://products/42` becomes route `/products/42`, identical to what a Universal Link would produce. Custom scheme links are only processed when `linkProcessingMode = ALL`.
+The SDK parses the URI as `/<host><path>` — so `posted-example-app://products/42` and `posted://products/42` both become route `/products/42`, identical to what a Universal Link would produce. Custom scheme links are only processed when `linkProcessingMode = ALL`.
 
-> Replace `posted-example-app` with your app's actual URI scheme. Custom scheme links do not require domain verification, making them useful for testing or internal tools.
+> `posted://` is the SDK's canonical scheme. Replace `posted-example-app` with your app's actual URI scheme; you can keep `posted://` registered alongside it. Custom scheme links do not require domain verification, making them useful for testing or internal tools.
 
 ## Quick start
 
