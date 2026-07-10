@@ -24,7 +24,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -64,9 +63,16 @@ object Posted {
     // Single-flight guard for first-launch resolution. Concurrent first callers share one
     // [resolveAndCache] so exactly one network resolve happens per launch (fire-once). The
     // shared work runs on [resolveScope] so it survives an individual caller's cancellation.
+    // [resolveMutex] also guards [resetSession]: the clear and inFlight-null both happen under
+    // the lock, so a resolveAppLaunch issued after resetSession() returns will always re-resolve.
     private val resolveScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val resolveMutex = Mutex()
     private var inFlight: Deferred<LinkResult>? = null
+
+    // Set synchronously by resetSession() before the async clear begins. When true, the
+    // resolveAppLaunch fast path is bypassed so it waits for the lock (and thus the clear).
+    @Volatile
+    private var clearPending: Boolean = false
 
     private lateinit var applicationContext: Context
     private lateinit var config: PostedConfig
@@ -149,8 +155,8 @@ object Posted {
         }
 
         return try {
-            // Fast path: already resolved → return cached without taking the lock.
-            if (attributionCache.isResolved()) {
+            // Fast path: already resolved and no reset in progress → return cached.
+            if (!clearPending && attributionCache.isResolved()) {
                 return attributionCache.loadResult() ?: resolveAndCache(intent)
             }
 
@@ -160,6 +166,15 @@ object Posted {
             // network call.
             val deferred =
                 resolveMutex.withLock {
+                    // Honor a pending reset first: clear exactly once under the lock so the
+                    // re-resolve below observes an empty cache. Doing the clear here (instead of
+                    // in a separate coroutine launched by resetSession) removes the lock-ordering
+                    // race where a resolve could win the mutex and serve the stale cache.
+                    if (clearPending) {
+                        attributionCache.clear()
+                        inFlight = null
+                        clearPending = false
+                    }
                     if (attributionCache.isResolved()) {
                         null
                     } else {
@@ -187,9 +202,18 @@ object Posted {
 
     /**
      * Re-arm the fire-once gate so the next [resolveAppLaunch] call performs a fresh network
-     * resolution.
+     * resolution. Non-blocking: never touches storage or `runBlocking` on the calling thread —
+     * it only sets a volatile flag, so it is safe to call from the main/UI thread.
+     *
+     * Contract: after [resetSession] returns, the next [resolveAppLaunch] clears the cache under
+     * the resolve lock and re-resolves (makes a fresh network call). The actual disk clear is
+     * deferred to that next resolve; the stale on-disk record is inert until then because every
+     * read path honors the pending-reset flag.
      *
      * Typical use: test harnesses, QA re-installs, or user account reset flows.
+     *
+     * If you need the cache physically cleared before proceeding (not just re-armed), use
+     * [resetSessionAndAwait] instead.
      */
     @JvmStatic
     fun resetSession() {
@@ -197,7 +221,27 @@ object Posted {
             Log.w(TAG, "SDK not initialized. Call Posted.initialize() first.")
             return
         }
-        runBlocking { attributionCache.clear() }
+        // Mark the reset synchronously. The next resolveAppLaunch performs the clear under
+        // resolveMutex, so there is no lock-ordering race and no coroutine to leak/deadlock.
+        clearPending = true
+    }
+
+    /**
+     * Suspend variant of [resetSession] that awaits the cache clear before returning.
+     * Safe to call from any dispatcher — never blocks the main thread.
+     */
+    @JvmStatic
+    suspend fun resetSessionAndAwait() {
+        if (!isInitialized) {
+            Log.w(TAG, "SDK not initialized. Call Posted.initialize() first.")
+            return
+        }
+        clearPending = true
+        resolveMutex.withLock {
+            inFlight = null
+            attributionCache.clear()
+            clearPending = false
+        }
     }
 
     // ── Deprecated shims (kept one cycle) ────────────────────────────────────
