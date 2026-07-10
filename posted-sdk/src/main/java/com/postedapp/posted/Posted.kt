@@ -166,6 +166,15 @@ object Posted {
             // network call.
             val deferred =
                 resolveMutex.withLock {
+                    // Honor a pending reset first: clear exactly once under the lock so the
+                    // re-resolve below observes an empty cache. Doing the clear here (instead of
+                    // in a separate coroutine launched by resetSession) removes the lock-ordering
+                    // race where a resolve could win the mutex and serve the stale cache.
+                    if (clearPending) {
+                        attributionCache.clear()
+                        inFlight = null
+                        clearPending = false
+                    }
                     if (attributionCache.isResolved()) {
                         null
                     } else {
@@ -193,14 +202,18 @@ object Posted {
 
     /**
      * Re-arm the fire-once gate so the next [resolveAppLaunch] call performs a fresh network
-     * resolution. The cache clear is async and does not block the calling thread.
+     * resolution. Non-blocking: never touches storage or `runBlocking` on the calling thread —
+     * it only sets a volatile flag, so it is safe to call from the main/UI thread.
      *
-     * Contract: after [resetSession] returns, the next [resolveAppLaunch] will re-resolve
-     * (make a fresh network call). In-progress resolutions are cancelled and will be retried.
+     * Contract: after [resetSession] returns, the next [resolveAppLaunch] clears the cache under
+     * the resolve lock and re-resolves (makes a fresh network call). The actual disk clear is
+     * deferred to that next resolve; the stale on-disk record is inert until then because every
+     * read path honors the pending-reset flag.
      *
      * Typical use: test harnesses, QA re-installs, or user account reset flows.
      *
-     * If you need to await the clear before proceeding, use [resetSessionAndAwait] instead.
+     * If you need the cache physically cleared before proceeding (not just re-armed), use
+     * [resetSessionAndAwait] instead.
      */
     @JvmStatic
     fun resetSession() {
@@ -208,14 +221,9 @@ object Posted {
             Log.w(TAG, "SDK not initialized. Call Posted.initialize() first.")
             return
         }
+        // Mark the reset synchronously. The next resolveAppLaunch performs the clear under
+        // resolveMutex, so there is no lock-ordering race and no coroutine to leak/deadlock.
         clearPending = true
-        resolveScope.launch {
-            resolveMutex.withLock {
-                inFlight = null
-                attributionCache.clear()
-                clearPending = false
-            }
-        }
     }
 
     /**

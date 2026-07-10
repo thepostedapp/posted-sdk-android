@@ -247,8 +247,8 @@ class ResolveAppLaunchTest {
 
             Posted.resetSession()
 
-            // resolveAppLaunch suspends on the resolveMutex until the async clear completes,
-            // then sees isResolved()==false and makes a fresh network call.
+            // resolveAppLaunch takes the resolveMutex, clears the cache (honoring the pending
+            // reset), then sees isResolved()==false and makes a fresh network call.
             server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/new"}"""))
             val rearmed = Posted.resolveAppLaunch(null)
             assertTrue(rearmed is LinkResult.Success)
@@ -263,15 +263,12 @@ class ResolveAppLaunchTest {
             Posted.resolveAppLaunch(null)
             assertTrue(Posted.resolveAppLaunch(null) == LinkResult.NoLink)
 
-            // resetSession() must return promptly without blocking this coroutine.
-            // If it called runBlocking on a single-threaded dispatcher, it would deadlock
-            // (the launched coroutine can't run while this thread is parked). The fact that
-            // the test completes proves resetSession() is non-blocking.
+            // resetSession() must return promptly without blocking this coroutine. It only sets
+            // a volatile flag (no runBlocking, no storage I/O), so it can never deadlock or ANR.
             Posted.resetSession()
 
-            // Enqueue the re-arm response AFTER resetSession() returns — the async clear
-            // races with resolveAppLaunch; resolveAppLaunch suspends on the mutex until clear
-            // finishes, then re-resolves exactly once.
+            // Enqueue the re-arm response AFTER resetSession() returns — the next resolveAppLaunch
+            // clears the cache under the resolveMutex, then re-resolves exactly once.
             server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/rearm"}"""))
             val result = Posted.resolveAppLaunch(null)
             assertTrue(result is LinkResult.Success)
