@@ -37,6 +37,14 @@ internal class DefaultStorageProvider(context: Context) : PostedStorage {
         }
     }
 
+    override suspend fun setItems(entries: Map<String, String>) {
+        withContext(Dispatchers.IO) {
+            prefs.edit().apply {
+                entries.forEach { (key, value) -> putString(key, value) }
+            }.apply()
+        }
+    }
+
     override suspend fun removeItem(key: String) {
         withContext(Dispatchers.IO) {
             prefs.edit().remove(key).apply()
