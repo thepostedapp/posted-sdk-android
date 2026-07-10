@@ -142,6 +142,30 @@ val config = PostedConfig(
 
 Use `DEFERRED_ONLY` when your navigation framework already handles App Links and scheme links — this prevents double-processing.
 
+### Fire-once attribution and `resetSession()`
+
+`Posted.resolveAppLaunch()` is **fire-once per install**: the first call makes one network request and caches the `LinkResult`. Every later call — including across app restarts, process death, and app updates — returns the cached result with no network call. This matches the fire-once contract of the other Posted SDKs.
+
+The cache re-arms (a fresh resolve happens again) in two cases:
+
+- **Reinstall** — the OS clears app storage, so there's nothing cached to return.
+- **Explicit `resetSession()`** — call this when you want the next `resolveAppLaunch()` to re-resolve, e.g. in test harnesses, QA re-installs, or a user-facing "log out / switch account" flow.
+
+```kotlin
+Posted.resetSession()
+```
+
+`resetSession()` is synchronous, non-blocking, and safe to call from the main/UI thread — it only flips a volatile flag and never touches storage or `runBlocking` on the calling thread. The actual cache clear happens lazily, inside the next `resolveAppLaunch()` call, under the same lock that guards resolution — so there's no race between a reset and an in-flight resolve. Concretely: after `resetSession()` returns, the *next* call to `resolveAppLaunch()` clears the stale cached result and performs a fresh network resolution; the on-disk record is inert until that next call, since every read path checks the pending-reset flag first.
+
+If you need the cache to be physically cleared before your code proceeds (rather than just re-armed for the next call), use the suspend variant instead:
+
+```kotlin
+lifecycleScope.launch {
+    Posted.resetSessionAndAwait() // clears the cache before returning
+    val result = Posted.resolveAppLaunch(intent) // always re-resolves
+}
+```
+
 ### The `posted://` scheme
 
 `posted://` is the SDK's canonical custom URL scheme. Register it on the activity that hosts your `PostedDelegate` so that `posted://…` links open your app and are resolved by the SDK, alongside the deterministic install-referrer flow used for deferred links:
@@ -320,16 +344,24 @@ object Posted {
     /** Initialize SDK — call once in Application.onCreate() or Activity.onCreate(). */
     fun initialize(context: Context, config: PostedConfig)
 
-    /** Process intent and extract deep link (App Link, scheme, or deferred). */
-    suspend fun processLink(intent: Intent): LinkResult
+    /**
+     * Resolve attribution for this app launch (App Link, scheme, or deferred).
+     * Fire-once per install — see "Fire-once attribution and resetSession()" above.
+     */
+    suspend fun resolveAppLaunch(intent: Intent? = null): LinkResult
 
-    /** Get deferred link only — ignores App Links and scheme links. */
-    suspend fun getDeferredLink(): LinkResult
+    /** Re-arm the fire-once gate so the next resolveAppLaunch() re-resolves. Main-thread safe. */
+    fun resetSession()
+
+    /** Suspend variant of resetSession() that awaits the cache clear before returning. */
+    suspend fun resetSessionAndAwait()
 
     /** Resolve a short link URL to its full data. */
     suspend fun resolveShortLink(url: String): ShortLinkResponse?
 }
 ```
+
+`processLink(intent)`, `getDeferredLink()`, `resolveInitialLink(...)` are deprecated aliases for `resolveAppLaunch(...)` kept for one release cycle — migrate to `resolveAppLaunch` directly.
 
 </details>
 
