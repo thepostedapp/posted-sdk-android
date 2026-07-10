@@ -9,11 +9,15 @@ import com.postedapp.posted.referrer.InstallReferrerHelper
 import com.postedapp.posted.storage.AttributionCache
 import com.postedapp.posted.storage.StorageKeys
 import com.postedapp.posted.test.InMemoryStorage
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -23,6 +27,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Integration tests for [Posted.resolveAppLaunch] covering:
@@ -272,6 +279,95 @@ class ResolveAppLaunchTest {
             server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/rearm"}"""))
             val result = Posted.resolveAppLaunch(null)
             assertTrue(result is LinkResult.Success)
+            assertEquals(2, server.requestCount)
+        }
+
+    // ── Re-arm — real-dispatcher & mid-resolve regressions (POS-182) ──────────
+
+    /**
+     * Regression guard for the flake that motivated [POS-182]: the original re-arm coverage ran
+     * under `runTest` virtual time, so the clear/re-resolve raced the real IO dispatcher. This test
+     * uses [runBlocking] — real threads, real time — so `resolveScope` (Dispatchers.Default) and the
+     * deferred clear execute on genuine dispatchers with no virtual-time scheduling to paper over a
+     * missed clear. It fails if the fire-once flag / cache blob is not cleared before re-arm (the
+     * second resolve would short-circuit on the stale cache and `requestCount` would stay at 1).
+     */
+    @Test
+    fun `resetSession re-arm on the real dispatcher makes a fresh network call`() =
+        runBlocking {
+            server.enqueue(MockResponse().setResponseCode(404))
+            assertEquals(LinkResult.NoLink, Posted.resolveAppLaunch(null))
+            // Second call is served from cache — proves the fire-once gate is armed.
+            assertEquals(LinkResult.NoLink, Posted.resolveAppLaunch(null))
+            assertEquals(1, server.requestCount)
+            assertTrue(storage.getItem(StorageKeys.ATTRIBUTION_RESOLVED) == "true")
+
+            Posted.resetSession()
+
+            // The clear is deferred to the next resolve (under resolveMutex). Enqueue the re-arm
+            // response only now, so a fresh network call is the only way to satisfy it.
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/new"}"""))
+            val rearmed = Posted.resolveAppLaunch(null)
+
+            assertTrue(rearmed is LinkResult.Success)
+            // A brand-new result replaced the cached NoLink → the stale blob was really cleared.
+            assertEquals("https://example.com/new", (rearmed as LinkResult.Success).url)
+            assertEquals(2, server.requestCount)
+        }
+
+    /**
+     * Edge case from [POS-182]: [Posted.resetSession] invoked *while a resolve is in flight*.
+     *
+     * The in-flight resolve is allowed to complete and cache its result — resetSession only sets the
+     * pending-clear flag, it does not cancel work in progress. The contract being asserted is that
+     * the reset is honored on the *next* resolve: it clears the (now stale) cache under the resolve
+     * lock and re-resolves, making a fresh network call rather than serving the just-cached value.
+     *
+     * Determinism comes from a gated MockWebServer dispatcher (CountDownLatch handshake), not
+     * `delay()` sleeps: the reset is guaranteed to land after the first request has hit the network
+     * but before its response is released.
+     */
+    @Test
+    fun `resetSession during an in-flight resolve re-arms the next resolve`() =
+        runBlocking {
+            val firstRequestArrived = CountDownLatch(1)
+            val releaseFirstResponse = CountDownLatch(1)
+            val requests = AtomicInteger(0)
+
+            server.dispatcher =
+                object : Dispatcher() {
+                    override fun dispatch(request: RecordedRequest): MockResponse =
+                        if (requests.getAndIncrement() == 0) {
+                            // First (in-flight) resolve: signal arrival, then block until the test
+                            // has issued resetSession() so the reset provably overlaps the resolve.
+                            firstRequestArrived.countDown()
+                            releaseFirstResponse.await()
+                            MockResponse().setResponseCode(404)
+                        } else {
+                            // Re-armed resolve.
+                            MockResponse().setResponseCode(200)
+                                .setBody("""{"link":"https://example.com/rearm"}""")
+                        }
+                }
+
+            // Kick off the first resolve on a real dispatcher; it will park in the dispatcher above.
+            val first = async(Dispatchers.Default) { Posted.resolveAppLaunch(null) }
+            assertTrue(
+                "first resolve should reach the network",
+                firstRequestArrived.await(5, TimeUnit.SECONDS),
+            )
+
+            // Reset while the first resolve is still parked mid-flight.
+            Posted.resetSession()
+
+            // Let the in-flight resolve finish and cache its (now stale) NoLink result.
+            releaseFirstResponse.countDown()
+            assertEquals(LinkResult.NoLink, first.await())
+
+            // The pending reset must force the next resolve to clear + re-resolve, not serve NoLink.
+            val rearmed = Posted.resolveAppLaunch(null)
+            assertTrue(rearmed is LinkResult.Success)
+            assertEquals("https://example.com/rearm", (rearmed as LinkResult.Success).url)
             assertEquals(2, server.requestCount)
         }
 
