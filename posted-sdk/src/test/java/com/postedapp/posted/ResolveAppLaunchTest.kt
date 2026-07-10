@@ -9,6 +9,8 @@ import com.postedapp.posted.referrer.InstallReferrerHelper
 import com.postedapp.posted.storage.AttributionCache
 import com.postedapp.posted.storage.StorageKeys
 import com.postedapp.posted.test.InMemoryStorage
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -192,6 +194,45 @@ class ResolveAppLaunchTest {
             val second = Posted.resolveAppLaunch(null)
             assertEquals(LinkResult.NoLink, second)
             assertEquals(1, server.requestCount)
+        }
+
+    // ── Concurrent first-launch single-flight de-dup (POS-156) ────────────────
+
+    @Test
+    fun `concurrent first-launch resolveAppLaunch makes exactly one network call - deferred branch`() =
+        runTest {
+            // Only ONE match-link response is enqueued: a second concurrent resolve would throw
+            // (no response) and, before the single-flight fix, two coroutines both hit the network.
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/app/single"}"""))
+
+            val n = 20
+            val results =
+                (1..n).map {
+                    async { Posted.resolveAppLaunch(null) }
+                }.awaitAll()
+
+            // Exactly one resolve reached the network; every caller observed the same result.
+            assertEquals(1, server.requestCount)
+            assertTrue(results.first() is LinkResult.Success)
+            results.forEach { assertEquals(results.first(), it) }
+        }
+
+    @Test
+    fun `concurrent first-launch resolveAppLaunch makes exactly one network call - link-present branch`() =
+        runTest {
+            // Non-short-link host → only the universal-link click hits the network (probe skipped).
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"allowed":true}"""))
+
+            val intent = linkIntent("https://example.com/promo/summer?code=XYZ")
+            val n = 20
+            val results =
+                (1..n).map {
+                    async { Posted.resolveAppLaunch(intent) }
+                }.awaitAll()
+
+            assertEquals(1, server.requestCount)
+            assertTrue(results.first() is LinkResult.Success)
+            results.forEach { assertEquals(results.first(), it) }
         }
 
     // ── Re-arm via resetSession ───────────────────────────────────────────────
