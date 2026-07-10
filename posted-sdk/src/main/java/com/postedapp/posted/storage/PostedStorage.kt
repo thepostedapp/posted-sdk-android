@@ -56,6 +56,19 @@ interface PostedStorage {
     )
 
     /**
+     * Store multiple string values in a single atomic commit.
+     *
+     * The default implementation falls back to sequential [setItem] calls, which is safe but not
+     * atomic. Override with a single-commit batch (e.g. one `SharedPreferences.edit().apply()`)
+     * if you need crash-proof atomicity for fire-once cache writes.
+     *
+     * @param entries Key-value pairs to store
+     */
+    suspend fun setItems(entries: Map<String, String>) {
+        entries.forEach { (key, value) -> setItem(key, value) }
+    }
+
+    /**
      * Remove a value from storage.
      * Optional - not required for SDK functionality.
      *

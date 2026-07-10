@@ -9,6 +9,7 @@ internal object StorageKeys {
 
     // Fire-once attribution cache (resolveAppLaunch)
     const val ATTRIBUTION_RESOLVED = "Posted_attributionResolved"
+    const val CACHE_SCHEMA_VERSION = "Posted_cacheSchemaVersion"
     const val CACHED_RESULT_KIND = "Posted_cachedResultKind"
     const val CACHED_RESULT_URL = "Posted_cachedResultUrl"
     const val CACHED_RESULT_ROUTE = "Posted_cachedResultRoute"

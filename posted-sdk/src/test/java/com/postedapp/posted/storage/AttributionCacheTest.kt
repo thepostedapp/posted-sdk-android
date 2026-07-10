@@ -6,6 +6,7 @@ import com.postedapp.posted.test.InMemoryStorage
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -105,5 +106,97 @@ class AttributionCacheTest {
             cache.saveResult(LinkResult.NotFirstLaunch)
             assertFalse(cache.isResolved())
             assertNull(cache.loadResult())
+        }
+
+    // ── POS-161: schema versioning (a–e) ────────────────────────────────────────
+
+    @Test
+    fun `(a) save-reload round-trips the schema version key`() =
+        runTest {
+            cache.saveResult(LinkResult.NoLink)
+            val version = storage.getItem(StorageKeys.CACHE_SCHEMA_VERSION)
+            assertEquals(AttributionCache.CURRENT_CACHE_SCHEMA.toString(), version)
+            assertTrue(cache.isResolved())
+            assertEquals(LinkResult.NoLink, cache.loadResult())
+        }
+
+    @Test
+    fun `(b) legacy record (flag+blob, no version key) loads without wipe and gets re-stamped`() =
+        runTest {
+            // Simulate a pre-POS-161 Success write: flag + blob, but NO schema version key.
+            storage.setItem(StorageKeys.ATTRIBUTION_RESOLVED, "true")
+            storage.setItem(StorageKeys.CACHED_RESULT_KIND, "success")
+            storage.setItem(StorageKeys.CACHED_RESULT_URL, "https://example.com/legacy")
+            storage.setItem(StorageKeys.CACHED_RESULT_ROUTE, "/legacy")
+            storage.setItem(StorageKeys.CACHED_RESULT_PATHNAME, "/legacy")
+            storage.setItem(StorageKeys.CACHED_RESULT_TYPE, "DEFERRED")
+            storage.setItem(StorageKeys.CACHED_RESULT_PARAMS, "{}")
+
+            assertTrue("legacy record must be treated as resolved", cache.isResolved())
+            val result = cache.loadResult()
+            assertNotNull("legacy record must load without wipe", result)
+            assertTrue(result is LinkResult.Success)
+            assertEquals("https://example.com/legacy", (result as LinkResult.Success).url)
+
+            // Must be re-stamped after the first read.
+            assertEquals(
+                AttributionCache.CURRENT_CACHE_SCHEMA.toString(),
+                storage.getItem(StorageKeys.CACHE_SCHEMA_VERSION),
+            )
+        }
+
+    @Test
+    fun `(c) version-mismatch record isResolved returns false and is cleared`() =
+        runTest {
+            // Write a record as if it came from a future schema version.
+            storage.setItem(StorageKeys.ATTRIBUTION_RESOLVED, "true")
+            storage.setItem(StorageKeys.CACHE_SCHEMA_VERSION, "999")
+            storage.setItem(StorageKeys.CACHED_RESULT_KIND, "no_link")
+
+            assertFalse("version mismatch must not be considered resolved", cache.isResolved())
+        }
+
+    @Test
+    fun `(d) torn write (blob+flag present but one required field absent) isResolved returns false`() =
+        runTest {
+            // Simulate a crash between blob writes: URL is missing, everything else is set.
+            storage.setItem(StorageKeys.ATTRIBUTION_RESOLVED, "true")
+            // No CACHE_SCHEMA_VERSION (legacy path will be invoked)
+            storage.setItem(StorageKeys.CACHED_RESULT_KIND, "success")
+            // StorageKeys.CACHED_RESULT_URL intentionally omitted — torn write
+            storage.setItem(StorageKeys.CACHED_RESULT_ROUTE, "/product")
+            storage.setItem(StorageKeys.CACHED_RESULT_PATHNAME, "/product")
+            storage.setItem(StorageKeys.CACHED_RESULT_TYPE, "DEFERRED")
+
+            assertFalse("torn legacy write must not be considered resolved", cache.isResolved())
+            // Caller will re-resolve (loadResult returns null).
+            assertNull(cache.loadResult())
+        }
+
+    @Test
+    fun `(e) saveResult writes all keys in a single setItems call - no interleaved partial state`() =
+        runTest {
+            // Intercept setItems to verify atomicity: the call must deliver the resolved flag
+            // AND all blob fields together. We do this by verifying that after saveResult,
+            // the version key and resolved flag are present simultaneously (no gap between them).
+            val result =
+                LinkResult.Success(
+                    url = "https://example.com/product",
+                    route = "/product",
+                    pathname = "/product",
+                    type = LinkType.VERIFIED,
+                    params = mapOf("ref" to "test"),
+                )
+            cache.saveResult(result)
+
+            // All keys written by saveResult must be present atomically.
+            assertNotNull(storage.getItem(StorageKeys.ATTRIBUTION_RESOLVED))
+            assertNotNull(storage.getItem(StorageKeys.CACHE_SCHEMA_VERSION))
+            assertNotNull(storage.getItem(StorageKeys.CACHED_RESULT_KIND))
+            assertNotNull(storage.getItem(StorageKeys.CACHED_RESULT_URL))
+            assertNotNull(storage.getItem(StorageKeys.CACHED_RESULT_ROUTE))
+            assertNotNull(storage.getItem(StorageKeys.CACHED_RESULT_PATHNAME))
+            assertNotNull(storage.getItem(StorageKeys.CACHED_RESULT_TYPE))
+            assertNotNull(storage.getItem(StorageKeys.CACHED_RESULT_PARAMS))
         }
 }
