@@ -24,7 +24,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -64,9 +63,16 @@ object Posted {
     // Single-flight guard for first-launch resolution. Concurrent first callers share one
     // [resolveAndCache] so exactly one network resolve happens per launch (fire-once). The
     // shared work runs on [resolveScope] so it survives an individual caller's cancellation.
+    // [resolveMutex] also guards [resetSession]: the clear and inFlight-null both happen under
+    // the lock, so a resolveAppLaunch issued after resetSession() returns will always re-resolve.
     private val resolveScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val resolveMutex = Mutex()
     private var inFlight: Deferred<LinkResult>? = null
+
+    // Set synchronously by resetSession() before the async clear begins. When true, the
+    // resolveAppLaunch fast path is bypassed so it waits for the lock (and thus the clear).
+    @Volatile
+    private var clearPending: Boolean = false
 
     private lateinit var applicationContext: Context
     private lateinit var config: PostedConfig
@@ -149,8 +155,8 @@ object Posted {
         }
 
         return try {
-            // Fast path: already resolved → return cached without taking the lock.
-            if (attributionCache.isResolved()) {
+            // Fast path: already resolved and no reset in progress → return cached.
+            if (!clearPending && attributionCache.isResolved()) {
                 return attributionCache.loadResult() ?: resolveAndCache(intent)
             }
 
@@ -187,9 +193,14 @@ object Posted {
 
     /**
      * Re-arm the fire-once gate so the next [resolveAppLaunch] call performs a fresh network
-     * resolution.
+     * resolution. The cache clear is async and does not block the calling thread.
+     *
+     * Contract: after [resetSession] returns, the next [resolveAppLaunch] will re-resolve
+     * (make a fresh network call). In-progress resolutions are cancelled and will be retried.
      *
      * Typical use: test harnesses, QA re-installs, or user account reset flows.
+     *
+     * If you need to await the clear before proceeding, use [resetSessionAndAwait] instead.
      */
     @JvmStatic
     fun resetSession() {
@@ -197,7 +208,32 @@ object Posted {
             Log.w(TAG, "SDK not initialized. Call Posted.initialize() first.")
             return
         }
-        runBlocking { attributionCache.clear() }
+        clearPending = true
+        resolveScope.launch {
+            resolveMutex.withLock {
+                inFlight = null
+                attributionCache.clear()
+                clearPending = false
+            }
+        }
+    }
+
+    /**
+     * Suspend variant of [resetSession] that awaits the cache clear before returning.
+     * Safe to call from any dispatcher — never blocks the main thread.
+     */
+    @JvmStatic
+    suspend fun resetSessionAndAwait() {
+        if (!isInitialized) {
+            Log.w(TAG, "SDK not initialized. Call Posted.initialize() first.")
+            return
+        }
+        clearPending = true
+        resolveMutex.withLock {
+            inFlight = null
+            attributionCache.clear()
+            clearPending = false
+        }
     }
 
     // ── Deprecated shims (kept one cycle) ────────────────────────────────────

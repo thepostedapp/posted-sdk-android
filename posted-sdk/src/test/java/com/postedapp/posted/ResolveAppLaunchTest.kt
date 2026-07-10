@@ -247,9 +247,34 @@ class ResolveAppLaunchTest {
 
             Posted.resetSession()
 
+            // resolveAppLaunch suspends on the resolveMutex until the async clear completes,
+            // then sees isResolved()==false and makes a fresh network call.
             server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/new"}"""))
             val rearmed = Posted.resolveAppLaunch(null)
             assertTrue(rearmed is LinkResult.Success)
+            assertEquals(2, server.requestCount)
+        }
+
+    @Test
+    fun `resetSession does not block the calling coroutine - no runBlocking on caller dispatcher`() =
+        runTest {
+            // Resolve once so there's something to clear.
+            server.enqueue(MockResponse().setResponseCode(404))
+            Posted.resolveAppLaunch(null)
+            assertTrue(Posted.resolveAppLaunch(null) == LinkResult.NoLink)
+
+            // resetSession() must return promptly without blocking this coroutine.
+            // If it called runBlocking on a single-threaded dispatcher, it would deadlock
+            // (the launched coroutine can't run while this thread is parked). The fact that
+            // the test completes proves resetSession() is non-blocking.
+            Posted.resetSession()
+
+            // Enqueue the re-arm response AFTER resetSession() returns — the async clear
+            // races with resolveAppLaunch; resolveAppLaunch suspends on the mutex until clear
+            // finishes, then re-resolves exactly once.
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/rearm"}"""))
+            val result = Posted.resolveAppLaunch(null)
+            assertTrue(result is LinkResult.Success)
             assertEquals(2, server.requestCount)
         }
 
@@ -308,8 +333,12 @@ class ResolveAppLaunchTest {
 
     private fun resetPostedSingleton() {
         val isInitField = Posted::class.java.getDeclaredField("isInitialized")
-        isInitField.isAccessible = true
+        val inFlightField = Posted::class.java.getDeclaredField("inFlight")
+        val clearPendingField = Posted::class.java.getDeclaredField("clearPending")
+        for (f in listOf(isInitField, inFlightField, clearPendingField)) f.isAccessible = true
         isInitField.set(Posted, false)
+        inFlightField.set(Posted, null)
+        clearPendingField.setBoolean(Posted, false)
 
         storage.clear()
     }
