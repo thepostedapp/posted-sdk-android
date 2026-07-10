@@ -19,10 +19,14 @@ import com.postedapp.posted.storage.FirstLaunchDetector
 import com.postedapp.posted.storage.PostedStorage
 import com.postedapp.posted.utils.UrlHelpers
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Main entry point for the posted-sdk SDK.
@@ -56,6 +60,13 @@ object Posted {
     private var isInitialized = false
 
     private val migrationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    // Single-flight guard for first-launch resolution. Concurrent first callers share one
+    // [resolveAndCache] so exactly one network resolve happens per launch (fire-once). The
+    // shared work runs on [resolveScope] so it survives an individual caller's cancellation.
+    private val resolveScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val resolveMutex = Mutex()
+    private var inFlight: Deferred<LinkResult>? = null
 
     private lateinit var applicationContext: Context
     private lateinit var config: PostedConfig
@@ -138,10 +149,36 @@ object Posted {
         }
 
         return try {
+            // Fast path: already resolved → return cached without taking the lock.
             if (attributionCache.isResolved()) {
                 return attributionCache.loadResult() ?: resolveAndCache(intent)
             }
-            resolveAndCache(intent)
+
+            // Slow path: single-flight the first resolution. Under the lock we double-check the
+            // cache (a peer may have resolved while we waited) and either join the in-flight
+            // resolve or start it. We await OUTSIDE the lock so waiters don't serialize on the
+            // network call.
+            val deferred =
+                resolveMutex.withLock {
+                    if (attributionCache.isResolved()) {
+                        null
+                    } else {
+                        inFlight ?: resolveScope.async { resolveAndCache(intent) }.also { inFlight = it }
+                    }
+                }
+
+            if (deferred == null) {
+                attributionCache.loadResult() ?: resolveAndCache(intent)
+            } else {
+                try {
+                    deferred.await()
+                } finally {
+                    // Re-arm for a later reset/re-resolve, but only if no peer already replaced it.
+                    resolveMutex.withLock {
+                        if (inFlight === deferred) inFlight = null
+                    }
+                }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "[Posted:RUNTIME_ERROR] Error in resolveAppLaunch", e)
             LinkResult.Error(e)
