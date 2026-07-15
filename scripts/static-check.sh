@@ -10,9 +10,9 @@ echo "▶ style: ktlint (BLOCKING)"
 # The search pattern does not appear in thepostedapp URLs so there are no false positives.
 echo "▶ org-url guard: no stale old-org references (BLOCKING)"
 STALE_PATTERN='github\.com/postedapp'
-if git ls-files | grep -v 'scripts/static-check.sh' | xargs grep -rl "$STALE_PATTERN" 2>/dev/null | grep -q .; then
+if MATCHES=$(git grep -n -- "$STALE_PATTERN" -- ':!scripts/static-check.sh'); then
   echo "✗ stale old-org URL found — update to github.com/thepostedapp:"
-  git ls-files | grep -v 'scripts/static-check.sh' | xargs grep -rn "$STALE_PATTERN" 2>/dev/null || true
+  echo "$MATCHES"
   exit 1
 fi
 echo "✓ static gate passed (full + type-aware checks run in CI)"
