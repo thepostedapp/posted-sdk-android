@@ -51,6 +51,14 @@ internal class DefaultStorageProvider(context: Context) : PostedStorage {
         }
     }
 
+    override suspend fun removeItems(keys: Set<String>) {
+        withContext(Dispatchers.IO) {
+            prefs.edit().apply {
+                keys.forEach { key -> remove(key) }
+            }.apply()
+        }
+    }
+
     companion object {
         private const val PREFS_NAME = "posted-sdk"
     }
