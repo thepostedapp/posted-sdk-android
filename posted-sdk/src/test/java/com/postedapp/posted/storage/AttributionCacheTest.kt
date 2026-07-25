@@ -93,6 +93,43 @@ class AttributionCacheTest {
         }
 
     @Test
+    fun `clear batches all keys into a single removeItems call - POS-346`() =
+        runTest {
+            val recordedCalls = mutableListOf<Set<String>>()
+            val spyStorage =
+                object : PostedStorage by storage {
+                    override suspend fun removeItems(keys: Set<String>) {
+                        recordedCalls.add(keys)
+                        storage.removeItems(keys)
+                    }
+
+                    override suspend fun removeItem(key: String) {
+                        error("clear() must batch via removeItems, not call removeItem directly")
+                    }
+                }
+            val spyCache = AttributionCache(spyStorage)
+            spyCache.saveResult(LinkResult.NoLink)
+
+            spyCache.clear()
+
+            assertEquals(1, recordedCalls.size)
+            assertEquals(
+                setOf(
+                    StorageKeys.ATTRIBUTION_RESOLVED,
+                    StorageKeys.CACHE_SCHEMA_VERSION,
+                    StorageKeys.CACHED_RESULT_KIND,
+                    StorageKeys.CACHED_RESULT_URL,
+                    StorageKeys.CACHED_RESULT_ROUTE,
+                    StorageKeys.CACHED_RESULT_PATHNAME,
+                    StorageKeys.CACHED_RESULT_TYPE,
+                    StorageKeys.CACHED_RESULT_PARAMS,
+                ),
+                recordedCalls.single(),
+            )
+            assertFalse(spyCache.isResolved())
+        }
+
+    @Test
     fun `Error result is not cached`() =
         runTest {
             cache.saveResult(LinkResult.Error(RuntimeException("boom")))

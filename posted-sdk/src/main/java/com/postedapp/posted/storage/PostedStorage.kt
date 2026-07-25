@@ -78,4 +78,17 @@ interface PostedStorage {
         // Default implementation does nothing
         // Override if your storage needs cleanup
     }
+
+    /**
+     * Remove multiple values from storage in a single atomic commit.
+     *
+     * The default implementation falls back to sequential [removeItem] calls, which is safe but not
+     * atomic. Override with a single-commit batch (e.g. one `SharedPreferences.edit().apply()`) if
+     * you need crash-proof atomicity — e.g. clearing a fire-once cache without a torn partial clear.
+     *
+     * @param keys Storage keys to remove
+     */
+    suspend fun removeItems(keys: Set<String>) {
+        keys.forEach { key -> removeItem(key) }
+    }
 }

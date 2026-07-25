@@ -61,14 +61,18 @@ internal class AttributionCache(private val storage: PostedStorage) {
     }
 
     suspend fun clear() {
-        storage.removeItem(StorageKeys.ATTRIBUTION_RESOLVED)
-        storage.removeItem(StorageKeys.CACHE_SCHEMA_VERSION)
-        storage.removeItem(StorageKeys.CACHED_RESULT_KIND)
-        storage.removeItem(StorageKeys.CACHED_RESULT_URL)
-        storage.removeItem(StorageKeys.CACHED_RESULT_ROUTE)
-        storage.removeItem(StorageKeys.CACHED_RESULT_PATHNAME)
-        storage.removeItem(StorageKeys.CACHED_RESULT_TYPE)
-        storage.removeItem(StorageKeys.CACHED_RESULT_PARAMS)
+        storage.removeItems(
+            setOf(
+                StorageKeys.ATTRIBUTION_RESOLVED,
+                StorageKeys.CACHE_SCHEMA_VERSION,
+                StorageKeys.CACHED_RESULT_KIND,
+                StorageKeys.CACHED_RESULT_URL,
+                StorageKeys.CACHED_RESULT_ROUTE,
+                StorageKeys.CACHED_RESULT_PATHNAME,
+                StorageKeys.CACHED_RESULT_TYPE,
+                StorageKeys.CACHED_RESULT_PARAMS,
+            ),
+        )
     }
 
     /**
