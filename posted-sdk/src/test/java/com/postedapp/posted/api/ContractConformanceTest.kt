@@ -7,8 +7,15 @@ import com.networknt.schema.SpecVersion
 import com.networknt.schema.ValidationMessage
 import com.postedapp.posted.BuildConfig
 import com.postedapp.posted.FlutterSdkHeaderResolver
+import com.postedapp.posted.Posted
 import com.postedapp.posted.PostedConfig
+import com.postedapp.posted.fingerprint.FingerprintCollector
 import com.postedapp.posted.models.DeterministicFingerprint
+import com.postedapp.posted.models.LinkResult
+import com.postedapp.posted.referrer.InstallReferrerHelper
+import com.postedapp.posted.storage.AttributionCache
+import com.postedapp.posted.storage.FirstLaunchDetector
+import com.postedapp.posted.test.InMemoryStorage
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -52,6 +59,7 @@ class ContractConformanceTest {
     @After
     fun tearDown() {
         server.shutdown()
+        resetPostedSingleton()
     }
 
     // ── match-link (deterministic) ───────────────────────────────────────────
@@ -74,6 +82,60 @@ class ContractConformanceTest {
         assertEquals("abc-click-123", json.get("clickId").asString)
         assertFalse("deterministic body must not carry platform", json.has("platform"))
         assertFalse("deterministic body must not carry model", json.has("model"))
+    }
+
+    // ── match-link via public resolveAppLaunch one-shot (POS-438) ─────────────
+    //
+    // Drives the PUBLIC Posted.resolveAppLaunch(...) end-to-end (fire-once attribution),
+    // rather than the low-level PostedApiClient.matchLink used above, and validates the
+    // captured match-link body against the same contract oneOf branches.
+
+    @Test
+    fun `resolveAppLaunch deferred branch with install-referrer click_id emits contract-valid deterministic match-link`() {
+        val postedStorage = InMemoryStorage()
+        initPostedSingleton(postedStorage)
+        injectInstallReferrer(clickId = "abc-click-123")
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/app/deterministic"}"""))
+
+        val result = runBlocking { Posted.resolveAppLaunch(null) }
+
+        assertTrue(result is LinkResult.Success)
+
+        val req = server.takeRequest()
+        assertEquals("POST", req.method)
+        assertEquals("/api/link/match-link", req.path)
+        assertCrossHeaders(req)
+
+        val body = req.body.readUtf8()
+        assertSchema(body, "schema-match-link-deterministic")
+
+        val json = JsonParser.parseString(body).asJsonObject
+        assertEquals("abc-click-123", json.get("clickId").asString)
+        assertFalse("deterministic body must not carry platform", json.has("platform"))
+    }
+
+    @Test
+    fun `resolveAppLaunch deferred branch with no install-referrer emits contract-valid probabilistic fingerprint`() {
+        val postedStorage = InMemoryStorage()
+        initPostedSingleton(postedStorage)
+        injectInstallReferrer(clickId = null)
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/app/probabilistic"}"""))
+
+        val result = runBlocking { Posted.resolveAppLaunch(null) }
+
+        assertTrue(result is LinkResult.Success)
+
+        val req = server.takeRequest()
+        assertEquals("POST", req.method)
+        assertEquals("/api/link/match-link", req.path)
+        assertCrossHeaders(req)
+
+        val body = req.body.readUtf8()
+        assertSchema(body, "schema-match-link-probabilistic")
+
+        val json = JsonParser.parseString(body).asJsonObject
+        assertFalse("probabilistic body must not carry clickId", json.has("clickId"))
+        assertEquals("android", json.get("platform").asString)
     }
 
     // ── resolve-short ────────────────────────────────────────────────────────
@@ -198,6 +260,70 @@ class ContractConformanceTest {
             javaClass.classLoader!!.getResourceAsStream("fixtures/$name.json")
                 ?: error("Missing test fixture: fixtures/$name.json"),
         )
+
+    /**
+     * Wires the [Posted] singleton (via reflection, same pattern as ResolveAppLaunchTest) at this
+     * test's MockWebServer, with attribution storage empty so the fire-once gate is armed and
+     * resolveAppLaunch performs a fresh network resolve.
+     */
+    private fun initPostedSingleton(postedStorage: InMemoryStorage) {
+        val base = server.url("/").toString().trimEnd('/')
+        val postedConfig = PostedConfig(apiKey = TEST_API_KEY, appId = TEST_APP_ID)
+        val postedApiClient = PostedApiClient(postedConfig, context, base)
+
+        val configField = Posted::class.java.getDeclaredField("config")
+        val apiClientField = Posted::class.java.getDeclaredField("apiClient")
+        val storageField = Posted::class.java.getDeclaredField("storage")
+        val attributionCacheField = Posted::class.java.getDeclaredField("attributionCache")
+        val isInitField = Posted::class.java.getDeclaredField("isInitialized")
+        val fingerprintField = Posted::class.java.getDeclaredField("fingerprintCollector")
+        val referrerField = Posted::class.java.getDeclaredField("installReferrerHelper")
+        val firstLaunchField = Posted::class.java.getDeclaredField("firstLaunchDetector")
+        val fields =
+            listOf(
+                configField,
+                apiClientField,
+                storageField,
+                attributionCacheField,
+                isInitField,
+                fingerprintField,
+                referrerField,
+                firstLaunchField,
+            )
+        for (f in fields) {
+            f.isAccessible = true
+        }
+
+        configField.set(Posted, postedConfig)
+        apiClientField.set(Posted, postedApiClient)
+        storageField.set(Posted, postedStorage)
+        attributionCacheField.set(Posted, AttributionCache(postedStorage))
+        fingerprintField.set(Posted, FingerprintCollector(context))
+        referrerField.set(Posted, InstallReferrerHelper(context))
+        firstLaunchField.set(Posted, FirstLaunchDetector(postedStorage))
+        isInitField.set(Posted, true)
+    }
+
+    /** Replaces the injected [InstallReferrerHelper] with a fake returning a fixed clickId. */
+    private fun injectInstallReferrer(clickId: String?) {
+        val fake =
+            object : InstallReferrerHelper(context) {
+                override suspend fun getClickId(): String? = clickId
+            }
+        val referrerField = Posted::class.java.getDeclaredField("installReferrerHelper")
+        referrerField.isAccessible = true
+        referrerField.set(Posted, fake)
+    }
+
+    private fun resetPostedSingleton() {
+        val isInitField = Posted::class.java.getDeclaredField("isInitialized")
+        val inFlightField = Posted::class.java.getDeclaredField("inFlight")
+        val clearPendingField = Posted::class.java.getDeclaredField("clearPending")
+        for (f in listOf(isInitField, inFlightField, clearPendingField)) f.isAccessible = true
+        isInitField.set(Posted, false)
+        inFlightField.set(Posted, null)
+        clearPendingField.setBoolean(Posted, false)
+    }
 
     companion object {
         private const val TEST_API_KEY = "test-bearer-key"
