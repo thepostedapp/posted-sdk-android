@@ -499,6 +499,55 @@ class ResolveAppLaunchTest {
             assertEquals(2, server.requestCount)
         }
 
+    // ── resetSession vs N concurrent resolveAppLaunch calls (POS-350) ─────────
+
+    /**
+     * Follow-up from [POS-181]/[POS-350]: the disk clear for a [Posted.resetSession] is deferred
+     * to the next [Posted.resolveAppLaunch] and performed once, under [resolveMutex][Posted], no
+     * matter how many callers are contending for it. This fires the reset once the cache is armed,
+     * then races N concurrent resolveAppLaunch callers against each other for the deferred-clear
+     * path — exactly one of them must win the clear-and-resolve race and every other caller must
+     * single-flight onto that same resolution (or its cached result), never re-clearing or
+     * re-resolving on their own.
+     */
+    @Test
+    fun `resetSession racing N concurrent resolveAppLaunch calls performs exactly one clear and one fresh resolve`() =
+        runBlocking {
+            // Arm the cache so there is a stale on-disk record for resetSession to invalidate.
+            server.enqueue(MockResponse().setResponseCode(404))
+            assertEquals(LinkResult.NoLink, Posted.resolveAppLaunch(null))
+            assertEquals(1, server.requestCount)
+
+            // Swap in a storage decorator that counts AttributionCache.clear()'s removeItems()
+            // calls, so the deferred clear can be asserted to have happened exactly once.
+            val countingStorage = CountingRemoveItemsStorage(storage)
+            val storageField = Posted::class.java.getDeclaredField("storage")
+            val attributionCacheField = Posted::class.java.getDeclaredField("attributionCache")
+            storageField.isAccessible = true
+            attributionCacheField.isAccessible = true
+            storageField.set(Posted, countingStorage)
+            attributionCacheField.set(Posted, AttributionCache(countingStorage))
+
+            Posted.resetSession()
+
+            // Only ONE re-arm response is enqueued: if more than one racer won the clear-and-
+            // resolve race, a second concurrent network resolve would throw (no response left).
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/rearmed"}"""))
+
+            val n = 20
+            val results =
+                (1..n).map {
+                    async(Dispatchers.Default) { Posted.resolveAppLaunch(null) }
+                }.awaitAll()
+
+            // Exactly one deferred clear and exactly one fresh network resolve — every one of the
+            // N concurrent callers de-duped onto the same single-flight resolution.
+            assertEquals(1, countingStorage.removeItemsCallCount)
+            assertEquals(2, server.requestCount)
+            assertTrue(results.first() is LinkResult.Success)
+            results.forEach { assertEquals(results.first(), it) }
+        }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private fun linkIntent(url: String): Intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
@@ -602,4 +651,29 @@ private class CancellingSetItemsStorage(private val delegate: PostedStorage) : P
     }
 
     override suspend fun removeItem(key: String) = delegate.removeItem(key)
+}
+
+/**
+ * Counts [removeItems] invocations so a test can assert [AttributionCache.clear]'s single atomic
+ * batch-remove happened exactly once, even when raced by many concurrent callers — see POS-350.
+ */
+private class CountingRemoveItemsStorage(private val delegate: PostedStorage) : PostedStorage {
+    private val removeItemsCalls = AtomicInteger(0)
+    val removeItemsCallCount: Int get() = removeItemsCalls.get()
+
+    override suspend fun getItem(key: String): String? = delegate.getItem(key)
+
+    override suspend fun setItem(
+        key: String,
+        value: String,
+    ) = delegate.setItem(key, value)
+
+    override suspend fun setItems(entries: Map<String, String>) = delegate.setItems(entries)
+
+    override suspend fun removeItem(key: String) = delegate.removeItem(key)
+
+    override suspend fun removeItems(keys: Set<String>) {
+        removeItemsCalls.incrementAndGet()
+        delegate.removeItems(keys)
+    }
 }
