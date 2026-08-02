@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Detour Attribution Backend — SDK⇄Backend Contract
-  version: 1.0.0
+  version: 1.1.0
   description: |
     **Authoritative, plug-and-play contract** for the Detour CPI / mobile-attribution
     backend. Reverse-engineered from all four client SDKs (React Native 2.3.0, Android
@@ -28,6 +28,19 @@ info:
     - `analytics/event`, `analytics/retention`: **fire-and-forget** — response body is
       never parsed; only the HTTP status is checked.
 
+    ## v1.1.0 — backend decisions folded in (board, 2026-06-23, POS-26)
+    The 7 carried open questions are now resolved (6) or explicitly deferred (1):
+    - `resolve-short.parameters` → **always a stringified JSON object** (backend parses the string).
+    - `universal-link-click.clickId` → **attribution join key** (install→click correlation);
+      `remainingClicks` → **informational only** (client display/debug), not enforced.
+    - `match-link` success body → returns **`link` + `clickId` + `expiresAt`** (SDKs still read only `link`).
+    - `analytics/event` & `analytics/retention` responses → **`{ ok: true, eventId }`** (dedup/debug;
+      still not parsed by current SDKs).
+    - click-limit period → **rolling 24h window per device + app**.
+    - absent `params` → **identical to `{}`** server-side.
+    - Identity model (`X-App-ID` / `device_id` / retry-offline) → **DEFERRED** to SDK investigation
+      POS-33; values below are not yet authoritative.
+
 servers:
   - url: https://godetour.dev
     description: Production (hardcoded in every SDK; not configurable)
@@ -48,7 +61,7 @@ components:
       in: header
       required: true
       schema: { type: string }
-      description: "Detour-issued app identifier supplied at SDK configure(). (OPEN-Q: exact semantics — bundle id vs Detour id — not validated client-side.)"
+      description: "Detour-issued app identifier supplied at SDK configure(). (DEFERRED: exact semantics — bundle id vs Detour id — pending SDK identity investigation POS-33; not validated client-side.)"
     XSdk:
       name: X-SDK
       in: header
@@ -115,11 +128,22 @@ components:
 
     LinkResponse:
       type: object
-      description: Shared response for match-link. Only `link` is consumed by the SDKs.
+      description: |
+        Shared response for match-link. Per board decision (POS-26) the success body
+        carries `link` + `clickId` + `expiresAt`. **Only `link` is consumed by the current
+        SDKs**; `clickId`/`expiresAt` are forward-looking (attribution correlation + window
+        expiry) and may be `null`/absent on a no-match.
       properties:
         link:
           type: [string, "null"]
           description: Matched deep-link URL, or null/absent when there is no match.
+        clickId:
+          type: [string, "null"]
+          description: "Attribution join key for the matched click (correlate install→click downstream). Not consumed by current SDKs."
+        expiresAt:
+          type: [string, "null"]
+          format: date-time
+          description: "Expiry of the matched link / attribution window, ISO-8601 UTC. Server-defined and not parsed by current SDKs (format recommended, not SDK-enforced). Null/absent on no-match."
       required: [link]
 
     ResolveShortRequest:
@@ -133,14 +157,15 @@ components:
       type: object
       description: |
         RN and Android read all three fields; iOS reads only `link`. `route`/`parameters`
-        are therefore optional. `parameters` is a JSON-encoded string (OPEN-Q: confirm
-        always-JSON vs query-string).
+        are therefore optional. RESOLVED (POS-26): `parameters` is ALWAYS a **stringified
+        JSON object** — the backend serializes the params object to a JSON string and the
+        SDK passes it through (never a query-string).
       properties:
         link: { type: string }
         route: { type: [string, "null"] }
         parameters:
           type: [string, "null"]
-          description: JSON-encoded query parameters (string), e.g. '{"color":"red"}'.
+          description: 'Stringified JSON object of route parameters, e.g. ''{"color":"red"}''. Always JSON (never a query-string); null/absent when there are no parameters.'
       required: [link]
 
     UniversalLinkClickRequest:
@@ -155,7 +180,7 @@ components:
         params:
           type: object
           additionalProperties: { type: string }
-          description: URL query params; omitted entirely when empty.
+          description: "URL query params; omitted entirely when empty. RESOLVED (POS-26): an absent `params` is semantically identical to an empty object `{}` server-side."
         metadata:
           type: object
           description: Omitted entirely (RN) when all values are null.
@@ -172,15 +197,26 @@ components:
       description: |
         Click-gate verdict. The SDK blocks the link ONLY when `allowed` is false (or HTTP
         402). `remainingClicks` is consumed by RN/iOS and ignored by Android, so it is
-        optional. All fields except `allowed` are optional.
+        optional. All fields except `allowed` are optional. RESOLVED (POS-26):
+        `clickId` is the **attribution join key** (correlate install→click downstream);
+        `remainingClicks` is **informational only** (client display/debug), never enforced
+        by the client. The click-limit period is a **rolling 24h window per device + app**.
       properties:
         allowed: { type: [boolean, "null"] }
-        clickId: { type: [string, "null"] }
+        clickId:
+          type: [string, "null"]
+          description: "Attribution join key — correlates this click with a later install. Informational to the SDK."
         error: { type: [string, "null"] }
         code: { type: [string, "null"] }
-        clicksInPeriod: { type: [integer, "null"] }
-        effectiveLimit: { type: [integer, "null"] }
-        remainingClicks: { type: [integer, "null"] }
+        clicksInPeriod:
+          type: [integer, "null"]
+          description: "Clicks counted in the current rolling 24h window for this device + app."
+        effectiveLimit:
+          type: [integer, "null"]
+          description: "Allowed clicks in the rolling 24h window (per device + app)."
+        remainingClicks:
+          type: [integer, "null"]
+          description: "`effectiveLimit - clicksInPeriod`. Informational only (client display/debug); not enforced client-side — the gate is driven solely by `allowed`/HTTP 402."
       required: [allowed]
 
     AnalyticsEventRequest:
@@ -214,6 +250,19 @@ components:
         device_id: { type: string }
       required: [event_name, timestamp, platform, device_id]
       additionalProperties: false
+
+    AnalyticsAck:
+      type: object
+      description: |
+        Server acknowledgement for `analytics/event` and `analytics/retention` (RESOLVED,
+        POS-26). **Not parsed by the current SDKs** — analytics are fire-and-forget and only
+        the HTTP status is checked. Defined for backend dedup/debug and forward SDK use.
+      properties:
+        ok: { type: boolean }
+        eventId:
+          type: string
+          description: Server-assigned event id (for dedup / debugging).
+      required: [ok, eventId]
 
 paths:
   /api/link/match-link:
@@ -264,6 +313,8 @@ paths:
                 matched:
                   value:
                     link: "https://godetour.dev/app/promo?ref=spring"
+                    clickId: "abc123-click-789"
+                    expiresAt: "2026-07-23T18:00:00.000Z"
                 noMatch:
                   value:
                     link: null
@@ -319,7 +370,8 @@ paths:
       description: |
         Fail-open gate. MUST respond in well under 5s (SDK timeout). Block the link with
         HTTP 402 or a 200 body `{allowed:false, ...}`; everything else lets the link
-        proceed.
+        proceed. Click-limit accounting is a **rolling 24h window per device + app**
+        (POS-26): `clicksInPeriod`/`effectiveLimit` describe that window.
       parameters: [{ $ref: '#/components/parameters/XAppId' }, { $ref: '#/components/parameters/XSdk' }]
       requestBody:
         required: true
@@ -413,7 +465,15 @@ paths:
                   device_id: "8f2b1c9e-7d3a-4e21-9f10-2c5b6a1d4e88"
       responses:
         '200':
-          description: Accepted. Body is not read by the SDK.
+          description: "Accepted. Body is `{ ok: true, eventId }` (POS-26) but is NOT read by the SDK."
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AnalyticsAck' }
+              examples:
+                ack:
+                  value:
+                    ok: true
+                    eventId: "evt_7f3a91c2"
         default:
           description: Failure is logged client-side and dropped (no retry).
 
@@ -438,6 +498,14 @@ paths:
                   device_id: "8f2b1c9e-7d3a-4e21-9f10-2c5b6a1d4e88"
       responses:
         '200':
-          description: Accepted. Body is not read by the SDK.
+          description: "Accepted. Body is `{ ok: true, eventId }` (POS-26) but is NOT read by the SDK."
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AnalyticsAck' }
+              examples:
+                ack:
+                  value:
+                    ok: true
+                    eventId: "evt_9b2d40af"
         default:
           description: Failure is logged client-side and dropped (no retry).

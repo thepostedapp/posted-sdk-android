@@ -8,7 +8,7 @@ import org.junit.Test
 /**
  * Guards the hand-authored schema-match-link-deterministic.json /
  * schema-match-link-probabilistic.json fixtures (consumed by [ContractConformanceTest]) against
- * silently drifting from the canonical detour-backend-contract.yaml match-link `oneOf` branches
+ * silently drifting from the canonical posted-backend-contract.yaml match-link `oneOf` branches
  * (DeterministicMatch | ProbabilisticFingerprint). If the yaml's properties/required list for
  * either branch changes without the corresponding fixture being updated, this test fails —
  * conformance can no longer pass against a stale local schema.
@@ -77,12 +77,12 @@ class MatchLinkFixtureDriftGuardTest {
     private fun extractYamlSchemaBranch(schemaName: String): SchemaShape {
         val yamlLines =
             javaClass.classLoader!!
-                .getResourceAsStream("fixtures/detour-backend-contract.yaml")
+                .getResourceAsStream("fixtures/posted-backend-contract.yaml")
                 ?.bufferedReader()?.readLines()
-                ?: error("Missing test fixture: fixtures/detour-backend-contract.yaml")
+                ?: error("Missing test fixture: fixtures/posted-backend-contract.yaml")
 
         val startIdx = yamlLines.indexOfFirst { it == "    $schemaName:" }
-        check(startIdx >= 0) { "Schema '$schemaName' not found in detour-backend-contract.yaml" }
+        check(startIdx >= 0) { "Schema '$schemaName' not found in posted-backend-contract.yaml" }
 
         val relativeBlockEnd =
             yamlLines.drop(startIdx + 1).indexOfFirst { line ->
