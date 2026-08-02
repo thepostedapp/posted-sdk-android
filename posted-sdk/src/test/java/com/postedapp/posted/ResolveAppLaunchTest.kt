@@ -511,7 +511,9 @@ private class ThrowingSetItemsStorage(private val delegate: PostedStorage) : Pos
         value: String,
     ) = delegate.setItem(key, value)
 
-    override suspend fun setItems(entries: Map<String, String>): Nothing = throw IllegalStateException("simulated storage write failure")
+    override suspend fun setItems(entries: Map<String, String>): Nothing {
+        throw IllegalStateException("simulated storage write failure")
+    }
 
     override suspend fun removeItem(key: String) = delegate.removeItem(key)
 }
@@ -529,7 +531,9 @@ private class CancellingSetItemsStorage(private val delegate: PostedStorage) : P
         value: String,
     ) = delegate.setItem(key, value)
 
-    override suspend fun setItems(entries: Map<String, String>): Nothing = throw kotlinx.coroutines.CancellationException("simulated coroutine cancellation")
+    override suspend fun setItems(entries: Map<String, String>): Nothing {
+        throw kotlinx.coroutines.CancellationException("simulated coroutine cancellation")
+    }
 
     override suspend fun removeItem(key: String) = delegate.removeItem(key)
 }
