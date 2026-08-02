@@ -29,6 +29,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.Collections
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Main entry point for the posted-sdk SDK.
@@ -71,6 +72,18 @@ object Posted {
     private val resolveScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val resolveMutex = Mutex()
     private var inFlight: Deferred<LinkResult>? = null
+
+    // Epoch the current [inFlight] resolution was created under; mutated only alongside
+    // [inFlight] under [resolveMutex]. Compared against [resolveEpoch] to detect a resolution
+    // that started before the most recent [resetSession] (mirrors iOS POS-267 / RN POS-154).
+    private var inFlightEpoch: Int = -1
+
+    // Bumped synchronously by resetSession()/resetSessionAndAwait() before the deferred clear
+    // happens. A resolution snapshots this epoch when it starts; if the epoch has since moved on
+    // by the time it settles, the resolution belongs to a stale (pre-reset) generation and must
+    // not clobber the fresh (post-reset) resolution's fire-once cache write or inFlight pointer —
+    // otherwise a de-duped caller would join/serve a stale result or trigger a duplicate resolve.
+    private val resolveEpoch = AtomicInteger(0)
 
     // Set synchronously by resetSession() before the async clear begins. When true, the
     // resolveAppLaunch fast path is bypassed so it waits for the lock (and thus the clear).
@@ -160,14 +173,15 @@ object Posted {
         return try {
             // Fast path: already resolved and no reset in progress → return cached.
             if (!clearPending && attributionCache.isResolved()) {
-                return attributionCache.loadResult() ?: resolveAndCache(intent)
+                return attributionCache.loadResult() ?: resolveAndCache(intent, resolveEpoch.get())
             }
 
             // Slow path: single-flight the first resolution. Under the lock we double-check the
             // cache (a peer may have resolved while we waited) and either join the in-flight
             // resolve or start it. We await OUTSIDE the lock so waiters don't serialize on the
-            // network call.
-            val deferred =
+            // network call. [deferredEpoch] is the epoch the joined/created resolution snapshotted
+            // at creation — used below to detect a stale (pre-reset) settle.
+            val (deferred, deferredEpoch) =
                 resolveMutex.withLock {
                     // Honor a pending reset first: clear exactly once under the lock so the
                     // re-resolve below observes an empty cache. Doing the clear here (instead of
@@ -179,21 +193,33 @@ object Posted {
                         clearPending = false
                     }
                     if (attributionCache.isResolved()) {
-                        null
+                        null to resolveEpoch.get()
                     } else {
-                        inFlight ?: resolveScope.async { resolveAndCache(intent) }.also { inFlight = it }
+                        val existing = inFlight
+                        if (existing != null) {
+                            existing to inFlightEpoch
+                        } else {
+                            val epoch = resolveEpoch.get()
+                            inFlightEpoch = epoch
+                            resolveScope.async { resolveAndCache(intent, epoch) }.also { inFlight = it } to epoch
+                        }
                     }
                 }
 
             if (deferred == null) {
-                attributionCache.loadResult() ?: resolveAndCache(intent)
+                attributionCache.loadResult() ?: resolveAndCache(intent, deferredEpoch)
             } else {
                 try {
                     deferred.await()
                 } finally {
-                    // Re-arm for a later reset/re-resolve, but only if no peer already replaced it.
+                    // Re-arm for a later reset/re-resolve, but only if no fresher (post-reset)
+                    // resolution has already replaced this pointer. Gated on BOTH identity and
+                    // epoch so a stale resolution settling after resetSession() can never clobber
+                    // the fresh resolution's inFlight pointer.
                     resolveMutex.withLock {
-                        if (inFlight === deferred) inFlight = null
+                        if (inFlight === deferred && resolveEpoch.get() == deferredEpoch) {
+                            inFlight = null
+                        }
                     }
                 }
             }
@@ -224,8 +250,11 @@ object Posted {
             Log.w(TAG, "SDK not initialized. Call Posted.initialize() first.")
             return
         }
-        // Mark the reset synchronously. The next resolveAppLaunch performs the clear under
+        // Bump the epoch synchronously, before marking the reset, so any resolution already in
+        // flight is stamped stale up front: its eventual cache write and inFlight-clear will be
+        // gated out by the epoch mismatch. The next resolveAppLaunch performs the clear under
         // resolveMutex, so there is no lock-ordering race and no coroutine to leak/deadlock.
+        resolveEpoch.incrementAndGet()
         clearPending = true
     }
 
@@ -239,6 +268,7 @@ object Posted {
             Log.w(TAG, "SDK not initialized. Call Posted.initialize() first.")
             return
         }
+        resolveEpoch.incrementAndGet()
         clearPending = true
         resolveMutex.withLock {
             inFlight = null
@@ -413,9 +443,15 @@ object Posted {
         )
     }
 
-    private suspend fun resolveAndCache(intent: Intent?): LinkResult {
+    private suspend fun resolveAndCache(
+        intent: Intent?,
+        epoch: Int,
+    ): LinkResult {
         val result = dispatchResolution(intent)
-        if (result !is LinkResult.Error) {
+        // Only persist if no resetSession() has landed since this resolution started — otherwise
+        // this is a stale (pre-reset) result and writing it would clobber the fresh post-reset
+        // resolution's cache entry.
+        if (result !is LinkResult.Error && resolveEpoch.get() == epoch) {
             try {
                 attributionCache.saveResult(result)
             } catch (e: CancellationException) {
