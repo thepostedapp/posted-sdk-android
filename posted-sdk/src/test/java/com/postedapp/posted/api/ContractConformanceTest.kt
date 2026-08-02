@@ -228,12 +228,27 @@ class ContractConformanceTest {
 
     // ── X-SDK header ─────────────────────────────────────────────────────────
 
+    /**
+     * POS-87 canonical contract (identical wording across iOS/Android/Flutter):
+     * - Format: the X-SDK header value MUST match `^<platform>/<semver>$`, where
+     *   `<semver>` = `\d+\.\d+\.\d+`.
+     * - Platform token (exact): native iOS -> `ios`; native Android -> `android`;
+     *   Flutter wrapper (both iOS-host and Android-host markers) -> `flutter`.
+     * - Backend dependency: the native dual-lookup (`PostedFlutterMarker` -> legacy
+     *   `DetourFlutterMarker`) reads this value verbatim; a token/format drift on any
+     *   platform silently mis-attributes installs. That is why this is pinned in CI.
+     */
+    private val sdkHeaderContractRegex = Regex("^android/\\d+\\.\\d+\\.\\d+$")
+
     @Test
     fun `X-SDK header uses android platform via FlutterSdkHeaderResolver without Flutter marker`() {
         val sdkHeader = FlutterSdkHeaderResolver.sdkHeaderValue
         // Without the Flutter marker class on the classpath, resolver falls back to BuildConfig.
         assertEquals(BuildConfig.SDK_HEADER_VALUE, sdkHeader)
-        assertTrue("X-SDK must start with android/", sdkHeader.startsWith("android/"))
+        assertTrue(
+            "X-SDK must match POS-87 canonical contract ^android/<semver>$: $sdkHeader",
+            sdkHeaderContractRegex.matches(sdkHeader),
+        )
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
