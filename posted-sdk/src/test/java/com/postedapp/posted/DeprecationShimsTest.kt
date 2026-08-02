@@ -175,7 +175,7 @@ class DeprecationShimsTest {
                 listOf(
                     "[Posted] processLink() is deprecated and will be removed in 4.0.0. Use resolveAppLaunch() instead.",
                     "[Posted] getDeferredLink() is deprecated and will be removed in 4.0.0. Use resolveAppLaunch() instead.",
-                    "[Posted] resolveInitialLink(intent) is deprecated and will be removed in 4.0.0. " +
+                    "[Posted] resolveInitialLink() is deprecated and will be removed in 4.0.0. " +
                         "Use resolveAppLaunch() instead.",
                     "[Posted] resolveShortLink() is deprecated and will be removed in 4.0.0. Use resolveAppLaunch() instead.",
                 )

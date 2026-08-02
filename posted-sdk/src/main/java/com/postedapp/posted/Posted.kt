@@ -313,7 +313,7 @@ object Posted {
     suspend fun resolveInitialLink(intent: Intent): LinkResult {
         warnOnce(
             "resolveInitialLink(Intent)",
-            "[Posted] resolveInitialLink(intent) is deprecated and will be removed in 4.0.0. " +
+            "[Posted] resolveInitialLink() is deprecated and will be removed in 4.0.0. " +
                 "Use resolveAppLaunch() instead.",
         )
         return resolveAppLaunch(intent)
