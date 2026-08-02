@@ -7,6 +7,7 @@ import com.postedapp.posted.models.LinkResult
 import com.postedapp.posted.models.LinkType
 import com.postedapp.posted.referrer.InstallReferrerHelper
 import com.postedapp.posted.storage.AttributionCache
+import com.postedapp.posted.storage.PostedStorage
 import com.postedapp.posted.storage.StorageKeys
 import com.postedapp.posted.test.InMemoryStorage
 import kotlinx.coroutines.Dispatchers
@@ -242,6 +243,67 @@ class ResolveAppLaunchTest {
             results.forEach { assertEquals(results.first(), it) }
         }
 
+    // ── Storage-write-failure isolation (POS-501) ─────────────────────────────
+
+    @Test
+    fun `throwing storage on persist does not convert the resolved result to Error and leaves fire-once unarmed`() =
+        runTest {
+            val throwingStorage = ThrowingSetItemsStorage(storage)
+            val storageField = Posted::class.java.getDeclaredField("storage")
+            val attributionCacheField = Posted::class.java.getDeclaredField("attributionCache")
+            storageField.isAccessible = true
+            attributionCacheField.isAccessible = true
+            storageField.set(Posted, throwingStorage)
+            attributionCacheField.set(Posted, AttributionCache(throwingStorage))
+
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/app/first"}"""))
+            val first = Posted.resolveAppLaunch(null)
+
+            assertTrue(first is LinkResult.Success)
+            assertEquals("https://example.com/app/first", (first as LinkResult.Success).url)
+            assertFalse(
+                "persist failed, so the fire-once flag must not be armed",
+                storage.getItem(StorageKeys.ATTRIBUTION_RESOLVED) == "true",
+            )
+
+            // Fire-once flag not armed -> the next call re-resolves instead of serving a stale cache.
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/app/second"}"""))
+            val second = Posted.resolveAppLaunch(null)
+            assertTrue(second is LinkResult.Success)
+            assertEquals("https://example.com/app/second", (second as LinkResult.Success).url)
+            assertEquals(2, server.requestCount)
+        }
+
+    @Test
+    fun `CancellationException from persist during resolveAndCache is rethrown, not swallowed as STORAGE_WRITE_FAILED`() =
+        runTest {
+            val cancellingStorage = CancellingSetItemsStorage(storage)
+            val storageField = Posted::class.java.getDeclaredField("storage")
+            val attributionCacheField = Posted::class.java.getDeclaredField("attributionCache")
+            storageField.isAccessible = true
+            attributionCacheField.isAccessible = true
+            storageField.set(Posted, cancellingStorage)
+            attributionCacheField.set(Posted, AttributionCache(cancellingStorage))
+
+            org.robolectric.shadows.ShadowLog.clear()
+
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/app/first"}"""))
+            val result = Posted.resolveAppLaunch(null)
+
+            // A real coroutine cancellation must not masquerade as a storage-write failure: it
+            // propagates past resolveAndCache's persist guard (rather than being caught by the
+            // generic `catch (e: Exception)`), so the resolved link is discarded via the outer
+            // RUNTIME_ERROR path and STORAGE_WRITE_FAILED is never logged.
+            assertTrue(result is LinkResult.Error)
+            val storageWriteFailedLogged =
+                org.robolectric.shadows.ShadowLog.getLogs().any { it.msg?.contains("STORAGE_WRITE_FAILED") == true }
+            assertFalse("a CancellationException must not be logged as STORAGE_WRITE_FAILED", storageWriteFailedLogged)
+            assertFalse(
+                "persist never happened, fire-once flag must not be armed",
+                storage.getItem(StorageKeys.ATTRIBUTION_RESOLVED) == "true",
+            )
+        }
+
     // ── Re-arm via resetSession ───────────────────────────────────────────────
 
     @Test
@@ -435,4 +497,43 @@ class ResolveAppLaunchTest {
 
         storage.clear()
     }
+}
+
+/**
+ * Delegates reads to [delegate] but simulates a custom [PostedStorage] provider whose atomic
+ * batch write throws (disk full, crypto-key error, IOException, etc.) — see POS-501.
+ */
+private class ThrowingSetItemsStorage(private val delegate: PostedStorage) : PostedStorage {
+    override suspend fun getItem(key: String): String? = delegate.getItem(key)
+
+    override suspend fun setItem(
+        key: String,
+        value: String,
+    ) = delegate.setItem(key, value)
+
+    override suspend fun setItems(entries: Map<String, String>): Nothing {
+        throw IllegalStateException("simulated storage write failure")
+    }
+
+    override suspend fun removeItem(key: String) = delegate.removeItem(key)
+}
+
+/**
+ * Simulates a persist that fails because the calling coroutine was cancelled mid-write (not a
+ * storage-provider fault) — see POS-501 review follow-up. Used to prove `resolveAndCache` rethrows
+ * [CancellationException] instead of swallowing it as a generic storage-write failure.
+ */
+private class CancellingSetItemsStorage(private val delegate: PostedStorage) : PostedStorage {
+    override suspend fun getItem(key: String): String? = delegate.getItem(key)
+
+    override suspend fun setItem(
+        key: String,
+        value: String,
+    ) = delegate.setItem(key, value)
+
+    override suspend fun setItems(entries: Map<String, String>): Nothing {
+        throw kotlinx.coroutines.CancellationException("simulated coroutine cancellation")
+    }
+
+    override suspend fun removeItem(key: String) = delegate.removeItem(key)
 }
