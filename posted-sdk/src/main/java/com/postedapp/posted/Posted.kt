@@ -18,6 +18,7 @@ import com.postedapp.posted.storage.DefaultStorageProvider
 import com.postedapp.posted.storage.FirstLaunchDetector
 import com.postedapp.posted.storage.PostedStorage
 import com.postedapp.posted.utils.UrlHelpers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -386,6 +387,8 @@ object Posted {
         if (result !is LinkResult.Error) {
             try {
                 attributionCache.saveResult(result)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 // Fire-once flag not armed; result still returned, next launch re-resolves (cost/attribution drift).
                 Log.d(TAG, "[Posted:STORAGE_WRITE_FAILED] Failed to persist fire-once cache; next launch will re-resolve.", e)

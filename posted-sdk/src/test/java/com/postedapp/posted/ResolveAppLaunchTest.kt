@@ -274,6 +274,36 @@ class ResolveAppLaunchTest {
             assertEquals(2, server.requestCount)
         }
 
+    @Test
+    fun `CancellationException from persist during resolveAndCache is rethrown, not swallowed as STORAGE_WRITE_FAILED`() =
+        runTest {
+            val cancellingStorage = CancellingSetItemsStorage(storage)
+            val storageField = Posted::class.java.getDeclaredField("storage")
+            val attributionCacheField = Posted::class.java.getDeclaredField("attributionCache")
+            storageField.isAccessible = true
+            attributionCacheField.isAccessible = true
+            storageField.set(Posted, cancellingStorage)
+            attributionCacheField.set(Posted, AttributionCache(cancellingStorage))
+
+            org.robolectric.shadows.ShadowLog.clear()
+
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/app/first"}"""))
+            val result = Posted.resolveAppLaunch(null)
+
+            // A real coroutine cancellation must not masquerade as a storage-write failure: it
+            // propagates past resolveAndCache's persist guard (rather than being caught by the
+            // generic `catch (e: Exception)`), so the resolved link is discarded via the outer
+            // RUNTIME_ERROR path and STORAGE_WRITE_FAILED is never logged.
+            assertTrue(result is LinkResult.Error)
+            val storageWriteFailedLogged =
+                org.robolectric.shadows.ShadowLog.getLogs().any { it.msg?.contains("STORAGE_WRITE_FAILED") == true }
+            assertFalse("a CancellationException must not be logged as STORAGE_WRITE_FAILED", storageWriteFailedLogged)
+            assertFalse(
+                "persist never happened, fire-once flag must not be armed",
+                storage.getItem(StorageKeys.ATTRIBUTION_RESOLVED) == "true",
+            )
+        }
+
     // ── Re-arm via resetSession ───────────────────────────────────────────────
 
     @Test
@@ -482,6 +512,24 @@ private class ThrowingSetItemsStorage(private val delegate: PostedStorage) : Pos
     ) = delegate.setItem(key, value)
 
     override suspend fun setItems(entries: Map<String, String>): Nothing = throw IllegalStateException("simulated storage write failure")
+
+    override suspend fun removeItem(key: String) = delegate.removeItem(key)
+}
+
+/**
+ * Simulates a persist that fails because the calling coroutine was cancelled mid-write (not a
+ * storage-provider fault) — see POS-501 review follow-up. Used to prove `resolveAndCache` rethrows
+ * [CancellationException] instead of swallowing it as a generic storage-write failure.
+ */
+private class CancellingSetItemsStorage(private val delegate: PostedStorage) : PostedStorage {
+    override suspend fun getItem(key: String): String? = delegate.getItem(key)
+
+    override suspend fun setItem(
+        key: String,
+        value: String,
+    ) = delegate.setItem(key, value)
+
+    override suspend fun setItems(entries: Map<String, String>): Nothing = throw kotlinx.coroutines.CancellationException("simulated coroutine cancellation")
 
     override suspend fun removeItem(key: String) = delegate.removeItem(key)
 }
