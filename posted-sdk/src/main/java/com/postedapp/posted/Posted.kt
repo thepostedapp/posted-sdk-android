@@ -384,7 +384,12 @@ object Posted {
     private suspend fun resolveAndCache(intent: Intent?): LinkResult {
         val result = dispatchResolution(intent)
         if (result !is LinkResult.Error) {
-            attributionCache.saveResult(result)
+            try {
+                attributionCache.saveResult(result)
+            } catch (e: Exception) {
+                // Fire-once flag not armed; result still returned, next launch re-resolves (cost/attribution drift).
+                Log.d(TAG, "[Posted:STORAGE_WRITE_FAILED] Failed to persist fire-once cache; next launch will re-resolve.", e)
+            }
         }
         return result
     }

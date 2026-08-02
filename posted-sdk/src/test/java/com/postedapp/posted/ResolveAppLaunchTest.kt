@@ -7,6 +7,7 @@ import com.postedapp.posted.models.LinkResult
 import com.postedapp.posted.models.LinkType
 import com.postedapp.posted.referrer.InstallReferrerHelper
 import com.postedapp.posted.storage.AttributionCache
+import com.postedapp.posted.storage.PostedStorage
 import com.postedapp.posted.storage.StorageKeys
 import com.postedapp.posted.test.InMemoryStorage
 import kotlinx.coroutines.Dispatchers
@@ -242,6 +243,37 @@ class ResolveAppLaunchTest {
             results.forEach { assertEquals(results.first(), it) }
         }
 
+    // ── Storage-write-failure isolation (POS-501) ─────────────────────────────
+
+    @Test
+    fun `throwing storage on persist does not convert the resolved result to Error and leaves fire-once unarmed`() =
+        runTest {
+            val throwingStorage = ThrowingSetItemsStorage(storage)
+            val storageField = Posted::class.java.getDeclaredField("storage")
+            val attributionCacheField = Posted::class.java.getDeclaredField("attributionCache")
+            storageField.isAccessible = true
+            attributionCacheField.isAccessible = true
+            storageField.set(Posted, throwingStorage)
+            attributionCacheField.set(Posted, AttributionCache(throwingStorage))
+
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/app/first"}"""))
+            val first = Posted.resolveAppLaunch(null)
+
+            assertTrue(first is LinkResult.Success)
+            assertEquals("https://example.com/app/first", (first as LinkResult.Success).url)
+            assertFalse(
+                "persist failed, so the fire-once flag must not be armed",
+                storage.getItem(StorageKeys.ATTRIBUTION_RESOLVED) == "true",
+            )
+
+            // Fire-once flag not armed -> the next call re-resolves instead of serving a stale cache.
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/app/second"}"""))
+            val second = Posted.resolveAppLaunch(null)
+            assertTrue(second is LinkResult.Success)
+            assertEquals("https://example.com/app/second", (second as LinkResult.Success).url)
+            assertEquals(2, server.requestCount)
+        }
+
     // ── Re-arm via resetSession ───────────────────────────────────────────────
 
     @Test
@@ -435,4 +467,21 @@ class ResolveAppLaunchTest {
 
         storage.clear()
     }
+}
+
+/**
+ * Delegates reads to [delegate] but simulates a custom [PostedStorage] provider whose atomic
+ * batch write throws (disk full, crypto-key error, IOException, etc.) — see POS-501.
+ */
+private class ThrowingSetItemsStorage(private val delegate: PostedStorage) : PostedStorage {
+    override suspend fun getItem(key: String): String? = delegate.getItem(key)
+
+    override suspend fun setItem(
+        key: String,
+        value: String,
+    ) = delegate.setItem(key, value)
+
+    override suspend fun setItems(entries: Map<String, String>): Nothing = throw IllegalStateException("simulated storage write failure")
+
+    override suspend fun removeItem(key: String) = delegate.removeItem(key)
 }
