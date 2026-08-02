@@ -433,6 +433,72 @@ class ResolveAppLaunchTest {
             assertEquals(2, server.requestCount)
         }
 
+    // ── resetSession vs in-flight resolution race (POS-461) ───────────────────
+
+    /**
+     * Mirrors iOS [POS-267] / RN [POS-154]: a resolution started *before* [Posted.resetSession]
+     * must not clobber the cache once it settles *after* a fresher post-reset resolution has
+     * already completed and cached its own result. Without an epoch guard, the stale resolution's
+     * unconditional cache write would overwrite the fresh result, and/or its inFlight-pointer
+     * clear would race the fresh resolution's own bookkeeping.
+     *
+     * Sequence: R1 starts and parks mid-network-call → resetSession() fires while R1 is still in
+     * flight → R2 starts, clears the (now-stale-pending) cache under the lock, and completes in
+     * full (a fresh network call) → R1's parked response is released and R1 settles, but its
+     * cache write must be suppressed (epoch mismatch) → a third caller must de-dup against R2's
+     * fresh cached result, not R1's stale one, with no additional network call.
+     */
+    @Test
+    fun `stale resolution settling after a fresher post-reset resolution does not clobber the cache`() =
+        runBlocking {
+            val firstRequestArrived = CountDownLatch(1)
+            val releaseFirstResponse = CountDownLatch(1)
+            val requests = AtomicInteger(0)
+
+            server.dispatcher =
+                object : Dispatcher() {
+                    override fun dispatch(request: RecordedRequest): MockResponse =
+                        if (requests.getAndIncrement() == 0) {
+                            // R1 (pre-reset): signal arrival, then park until released — it must
+                            // settle AFTER R2 (post-reset) has already completed and cached.
+                            firstRequestArrived.countDown()
+                            releaseFirstResponse.await()
+                            MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/stale"}""")
+                        } else {
+                            MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/fresh"}""")
+                        }
+                }
+
+            // R1: kicked off on a real dispatcher; parks mid-network-call.
+            val first = async(Dispatchers.Default) { Posted.resolveAppLaunch(null) }
+            assertTrue(
+                "R1 should reach the network before we reset",
+                firstRequestArrived.await(5, TimeUnit.SECONDS),
+            )
+
+            // Reset while R1 is still parked mid-flight.
+            Posted.resetSession()
+
+            // R2: clears the cache under the lock (honoring the pending reset), creates a fresh
+            // inFlight under the bumped epoch, and completes in full — one fresh network call.
+            val second = Posted.resolveAppLaunch(null)
+            assertTrue(second is LinkResult.Success)
+            assertEquals("https://example.com/fresh", (second as LinkResult.Success).url)
+
+            // Release R1 now that R2 has already cached its fresh result. R1's cache write must
+            // be suppressed by the epoch mismatch — it belongs to the pre-reset generation.
+            releaseFirstResponse.countDown()
+            val firstResult = first.await()
+            assertTrue(firstResult is LinkResult.Success)
+            assertEquals("https://example.com/stale", (firstResult as LinkResult.Success).url)
+
+            // Third caller must de-dup against R2's fresh cached result, not R1's stale one — zero
+            // additional network calls, and the correct total network-call count (2, not 3).
+            val third = Posted.resolveAppLaunch(null)
+            assertEquals(second, third)
+            assertEquals(2, server.requestCount)
+        }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private fun linkIntent(url: String): Intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
