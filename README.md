@@ -2,6 +2,8 @@
 
 posted-sdk is an Android SDK for handling deferred deep links. A deferred link works like a regular deep link, but survives the Play Store install — a user who clicks a link before having the app installed is redirected to the right screen on first launch. posted-sdk also handles App Links and custom scheme links in a single unified API.
 
+> Upgrading from the legacy Detour SDK or an earlier 2.x release? See the [migration guide](./MIGRATION.md) and [CHANGELOG](./CHANGELOG.md) for the 3.0.0 attribution-first reshape.
+
 ## Installation
 
 Add the SDK to your `build.gradle.kts`:
