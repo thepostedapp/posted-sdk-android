@@ -5,9 +5,6 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# Keep Detour SDK model classes for Gson serialization
--keep class com.swmansion.detour.models.** { *; }
-
 # Keep Gson annotations
 -keepattributes Signature
 -keepattributes *Annotation*
