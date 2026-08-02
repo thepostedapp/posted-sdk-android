@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import com.postedapp.posted.analytics.PostedAnalytics
 import com.postedapp.posted.api.PostedApiClient
 import com.postedapp.posted.fingerprint.FingerprintCollector
@@ -27,6 +28,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.Collections
 
 /**
  * Main entry point for the posted-sdk SDK.
@@ -247,6 +249,29 @@ object Posted {
 
     // ── Deprecated shims (kept one cycle) ────────────────────────────────────
 
+    // Methods that have already logged their deprecation notice this session, keyed per-shim
+    // so each of the 5 shims warns independently. Thread-safe: warnOnce may be invoked
+    // concurrently from different callers/dispatchers.
+    private val warnedDeprecations = Collections.synchronizedSet(mutableSetOf<String>())
+
+    private fun warnOnce(
+        method: String,
+        message: String,
+    ) {
+        if (warnedDeprecations.add(method)) {
+            Log.w(TAG, message)
+        }
+    }
+
+    /**
+     * Re-arms all deprecation-warning de-dup so the next invocation of each shim logs again.
+     * Test/QA seam only — not part of the public API surface.
+     */
+    @VisibleForTesting
+    internal fun resetDeprecationWarnings() {
+        warnedDeprecations.clear()
+    }
+
     /**
      * @deprecated Use [resolveAppLaunch] instead.
      */
@@ -256,7 +281,10 @@ object Posted {
     )
     @JvmStatic
     suspend fun resolveInitialLink(intent: Intent): LinkResult {
-        Log.w(TAG, "[Posted] resolveInitialLink(intent) is deprecated. Use resolveAppLaunch(intent) instead.")
+        warnOnce(
+            "resolveInitialLink(Intent)",
+            "[Posted] resolveInitialLink(intent) is deprecated. Use resolveAppLaunch(intent) instead.",
+        )
         return resolveAppLaunch(intent)
     }
 
@@ -269,7 +297,10 @@ object Posted {
     )
     @JvmStatic
     suspend fun resolveInitialLink(): LinkResult {
-        Log.w(TAG, "[Posted] resolveInitialLink() is deprecated. Use resolveAppLaunch() instead.")
+        warnOnce(
+            "resolveInitialLink()",
+            "[Posted] resolveInitialLink() is deprecated. Use resolveAppLaunch() instead.",
+        )
         return resolveAppLaunch(null)
     }
 
@@ -282,7 +313,7 @@ object Posted {
     )
     @JvmStatic
     suspend fun processLink(intent: Intent): LinkResult {
-        Log.w(TAG, "[Posted] processLink() is deprecated. Use resolveAppLaunch(intent) instead.")
+        warnOnce("processLink", "[Posted] processLink() is deprecated. Use resolveAppLaunch(intent) instead.")
         return resolveAppLaunch(intent)
     }
 
@@ -295,7 +326,7 @@ object Posted {
     )
     @JvmStatic
     suspend fun getDeferredLink(): LinkResult {
-        Log.w(TAG, "[Posted] getDeferredLink() is deprecated. Use resolveAppLaunch() instead.")
+        warnOnce("getDeferredLink", "[Posted] getDeferredLink() is deprecated. Use resolveAppLaunch() instead.")
         return resolveAppLaunch(null)
     }
 
@@ -308,7 +339,7 @@ object Posted {
     )
     @JvmStatic
     suspend fun resolveShortLink(url: String): ShortLinkResponse? {
-        Log.w(TAG, "[Posted] resolveShortLink() is deprecated. Use resolveAppLaunch() for link resolution.")
+        warnOnce("resolveShortLink", "[Posted] resolveShortLink() is deprecated. Use resolveAppLaunch() for link resolution.")
         if (!isInitialized) {
             Log.w(TAG, "SDK not initialized. Call Posted.initialize() first.")
             return null
