@@ -35,7 +35,7 @@ import org.robolectric.RuntimeEnvironment
  * contract-conformant requests to all 5 backend endpoints.
  *
  * Requests are captured via MockWebServer. Bodies are validated against
- * JSON Schema excerpts pinned from detour-backend-contract.yaml.
+ * JSON Schema excerpts pinned from posted-backend-contract.yaml.
  */
 @RunWith(RobolectricTestRunner::class)
 class ContractConformanceTest {
