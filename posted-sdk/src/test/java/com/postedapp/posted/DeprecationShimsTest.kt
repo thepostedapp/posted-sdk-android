@@ -154,6 +154,36 @@ class DeprecationShimsTest {
             assertNull(result)
         }
 
+    // ── canonical wording (POS-496/POS-534) ──────────────────────────────────
+
+    @Test
+    fun `each deprecated shim logs the canonical template — prefix, removal clause, verb`() =
+        runTest {
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"allowed":true}"""))
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/a"}"""))
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/b"}"""))
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/full-url"}"""))
+            org.robolectric.shadows.ShadowLog.clear()
+
+            Posted.processLink(linkIntent("https://example.com/canon"))
+            Posted.getDeferredLink()
+            Posted.resolveInitialLink(linkIntent("https://example.com/canon2"))
+            Posted.resolveShortLink("https://godetour.dev/xAb")
+
+            val logs = org.robolectric.shadows.ShadowLog.getLogs().mapNotNull { it.msg }
+            val expected =
+                listOf(
+                    "[Posted] processLink() is deprecated and will be removed in 4.0.0. Use resolveAppLaunch() instead.",
+                    "[Posted] getDeferredLink() is deprecated and will be removed in 4.0.0. Use resolveAppLaunch() instead.",
+                    "[Posted] resolveInitialLink(intent) is deprecated and will be removed in 4.0.0. " +
+                        "Use resolveAppLaunch() instead.",
+                    "[Posted] resolveShortLink() is deprecated and will be removed in 4.0.0. Use resolveAppLaunch() instead.",
+                )
+            expected.forEach { message ->
+                assertTrue("expected log containing: $message", logs.any { it == message })
+            }
+        }
+
     // ── once-per-session de-dup (POS-517) ────────────────────────────────────
 
     @Test

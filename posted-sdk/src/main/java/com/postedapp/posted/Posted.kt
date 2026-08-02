@@ -313,7 +313,8 @@ object Posted {
     suspend fun resolveInitialLink(intent: Intent): LinkResult {
         warnOnce(
             "resolveInitialLink(Intent)",
-            "[Posted] resolveInitialLink(intent) is deprecated. Use resolveAppLaunch(intent) instead.",
+            "[Posted] resolveInitialLink(intent) is deprecated and will be removed in 4.0.0. " +
+                "Use resolveAppLaunch() instead.",
         )
         return resolveAppLaunch(intent)
     }
@@ -329,7 +330,8 @@ object Posted {
     suspend fun resolveInitialLink(): LinkResult {
         warnOnce(
             "resolveInitialLink()",
-            "[Posted] resolveInitialLink() is deprecated. Use resolveAppLaunch() instead.",
+            "[Posted] resolveInitialLink() is deprecated and will be removed in 4.0.0. " +
+                "Use resolveAppLaunch() instead.",
         )
         return resolveAppLaunch(null)
     }
@@ -343,7 +345,10 @@ object Posted {
     )
     @JvmStatic
     suspend fun processLink(intent: Intent): LinkResult {
-        warnOnce("processLink", "[Posted] processLink() is deprecated. Use resolveAppLaunch(intent) instead.")
+        warnOnce(
+            "processLink",
+            "[Posted] processLink() is deprecated and will be removed in 4.0.0. Use resolveAppLaunch() instead.",
+        )
         return resolveAppLaunch(intent)
     }
 
@@ -356,7 +361,10 @@ object Posted {
     )
     @JvmStatic
     suspend fun getDeferredLink(): LinkResult {
-        warnOnce("getDeferredLink", "[Posted] getDeferredLink() is deprecated. Use resolveAppLaunch() instead.")
+        warnOnce(
+            "getDeferredLink",
+            "[Posted] getDeferredLink() is deprecated and will be removed in 4.0.0. Use resolveAppLaunch() instead.",
+        )
         return resolveAppLaunch(null)
     }
 
@@ -369,7 +377,10 @@ object Posted {
     )
     @JvmStatic
     suspend fun resolveShortLink(url: String): ShortLinkResponse? {
-        warnOnce("resolveShortLink", "[Posted] resolveShortLink() is deprecated. Use resolveAppLaunch() for link resolution.")
+        warnOnce(
+            "resolveShortLink",
+            "[Posted] resolveShortLink() is deprecated and will be removed in 4.0.0. Use resolveAppLaunch() instead.",
+        )
         if (!isInitialized) {
             Log.w(TAG, "SDK not initialized. Call Posted.initialize() first.")
             return null
