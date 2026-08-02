@@ -49,6 +49,7 @@ class DeprecationShimsTest {
     fun tearDown() {
         server.shutdown()
         resetPostedSingleton()
+        Posted.resetDeprecationWarnings()
     }
 
     // ── resolveInitialLink(Intent) ───────────────────────────────────────────
@@ -151,6 +152,60 @@ class DeprecationShimsTest {
             val result = Posted.resolveShortLink("https://godetour.dev/invalid")
 
             assertNull(result)
+        }
+
+    // ── once-per-session de-dup (POS-517) ────────────────────────────────────
+
+    @Test
+    fun `processLink logs its deprecation notice only once across repeated calls`() =
+        runTest {
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"allowed":true}"""))
+            org.robolectric.shadows.ShadowLog.clear()
+
+            Posted.processLink(linkIntent("https://example.com/first"))
+            Posted.processLink(linkIntent("https://example.com/first"))
+
+            val warningCount =
+                org.robolectric.shadows.ShadowLog.getLogs()
+                    .count { it.msg?.contains("processLink() is deprecated") == true }
+            assertEquals(1, warningCount)
+        }
+
+    @Test
+    fun `each deprecated shim warns independently of the others`() =
+        runTest {
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/a"}"""))
+            org.robolectric.shadows.ShadowLog.clear()
+
+            Posted.getDeferredLink()
+            Posted.resolveInitialLink()
+
+            val logs = org.robolectric.shadows.ShadowLog.getLogs()
+            assertTrue(logs.any { it.msg?.contains("getDeferredLink() is deprecated") == true })
+            assertTrue(logs.any { it.msg?.contains("resolveInitialLink() is deprecated") == true })
+        }
+
+    @Test
+    fun `resetDeprecationWarnings re-arms a shim so it warns again`() =
+        runTest {
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/full-url"}"""))
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/full-url"}"""))
+            org.robolectric.shadows.ShadowLog.clear()
+
+            Posted.resolveShortLink("https://godetour.dev/xAb")
+            Posted.resolveShortLink("https://godetour.dev/xAb")
+            val countBeforeReset =
+                org.robolectric.shadows.ShadowLog.getLogs()
+                    .count { it.msg?.contains("resolveShortLink() is deprecated") == true }
+
+            Posted.resetDeprecationWarnings()
+            Posted.resolveShortLink("https://godetour.dev/xAb")
+            val countAfterReset =
+                org.robolectric.shadows.ShadowLog.getLogs()
+                    .count { it.msg?.contains("resolveShortLink() is deprecated") == true }
+
+            assertEquals(1, countBeforeReset)
+            assertEquals(2, countAfterReset)
         }
 
     // ── helpers ──────────────────────────────────────────────────────────────
