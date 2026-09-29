@@ -1,0 +1,7 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Base.Theme.PostedAndroidSDK" parent="Theme.Material3.DayNight.NoActionBar">
+         <item name="colorPrimary">@color/primary</item>
+    </style>
+
+    <style name="Theme.PostedAndroidSDK" parent="Base.Theme.PostedAndroidSDK" />
+</resources>

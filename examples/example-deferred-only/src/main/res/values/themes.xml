@@ -1,0 +1,14 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Base.Theme.PostedAndroidSDK" parent="Theme.Material3.DayNight.NoActionBar">
+         <item name="colorPrimary">@color/primary</item>
+    </style>
+
+    <style name="Theme.PostedAndroidSDK" parent="Base.Theme.PostedAndroidSDK" />
+
+    <!-- Splash screen theme: shown while getDeferredLink() resolves -->
+    <style name="Theme.PostedAndroidSDK.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/primary</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.PostedAndroidSDK</item>
+    </style>
+</resources>
