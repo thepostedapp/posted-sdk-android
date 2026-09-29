@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
-  title: Detour Attribution Backend — SDK⇄Backend Contract
+  title: Posted Attribution Backend — SDK⇄Backend Contract
   version: 1.1.0
   description: |
-    **Authoritative, plug-and-play contract** for the Detour CPI / mobile-attribution
+    **Authoritative, plug-and-play contract** for the Posted CPI / mobile-attribution
     backend. Reverse-engineered from all four client SDKs (React Native 2.3.0, Android
     1.1.0, iOS 1.1.0, Flutter 1.2.0 — which bridges to the native iOS/Android SDKs).
 
@@ -13,7 +13,7 @@ info:
     with every shape they parse.
 
     ## Conventions
-    - All endpoints are `POST`, `application/json`, over HTTPS to `https://godetour.dev`.
+    - All endpoints are `POST`, `application/json`, over HTTPS to `https://attr.postedapp.com`.
     - No compression, no HMAC/request signing, no idempotency keys, no client retries.
     - Two timestamp conventions (intentional, see schemas): **epoch milliseconds** on the
       link endpoints, **ISO-8601 UTC** (`yyyy-MM-dd'T'HH:mm:ss.SSS'Z'`) on analytics.
@@ -42,7 +42,7 @@ info:
       POS-33; values below are not yet authoritative.
 
 servers:
-  - url: https://godetour.dev
+  - url: https://attr.postedapp.com
     description: Production (hardcoded in every SDK; not configurable)
 
 security:
@@ -61,7 +61,7 @@ components:
       in: header
       required: true
       schema: { type: string }
-      description: "Detour-issued app identifier supplied at SDK configure(). (DEFERRED: exact semantics — bundle id vs Detour id — pending SDK identity investigation POS-33; not validated client-side.)"
+      description: "Posted-issued app identifier supplied at SDK configure(). (DEFERRED: exact semantics — bundle id vs Posted id — pending SDK identity investigation POS-33; not validated client-side.)"
     XSdk:
       name: X-SDK
       in: header
@@ -236,7 +236,7 @@ components:
         platform: { type: string, enum: [ios, android] }
         device_id:
           type: string
-          description: SDK-generated UUIDv4, persisted on-device (key `Detour_deviceId`). Not a hardware id.
+          description: SDK-generated UUIDv4, persisted on-device (key `Posted_deviceId`). Not a hardware id.
       required: [event_name, timestamp, platform, device_id]
       additionalProperties: false
 
@@ -300,7 +300,7 @@ paths:
                   locale:
                     - languageTag: "en-US"
                   timezone: "America/New_York"
-                  userAgent: "Detour/1.1.0 (iOS 17.5.1)"
+                  userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
                   timestamp: 1719158400000
                   pastedLink: null
       responses:
@@ -312,7 +312,7 @@ paths:
               examples:
                 matched:
                   value:
-                    link: "https://godetour.dev/app/promo?ref=spring"
+                    link: "https://l.postedapp.com/app/promo?ref=spring"
                     clickId: "abc123-click-789"
                     expiresAt: "2026-07-23T18:00:00.000Z"
                 noMatch:
@@ -342,7 +342,7 @@ paths:
             examples:
               shortLink:
                 value:
-                  url: "https://godetour.dev/x9Az"
+                  url: "https://l.postedapp.com/x9Az"
       responses:
         '200':
           description: Resolved link. Returning the input URL unchanged is treated as a loop and ignored.
@@ -352,12 +352,12 @@ paths:
               examples:
                 resolved:
                   value:
-                    link: "https://godetour.dev/app/product/42"
+                    link: "https://l.postedapp.com/app/product/42"
                     route: "/product/42"
                     parameters: '{"color":"red"}'
                 linkOnly:
                   value:
-                    link: "https://godetour.dev/app/product/42"
+                    link: "https://l.postedapp.com/app/product/42"
         '404':
           description: Short link not found — SDK falls back to the raw URL.
         default:
@@ -382,7 +382,7 @@ paths:
               click:
                 summary: iOS click with query params and metadata.
                 value:
-                  url: "https://godetour.dev/u/launch?campaign=spring&variant=b"
+                  url: "https://l.postedapp.com/u/launch?campaign=spring&variant=b"
                   timestamp: 1719158400000
                   platform: ios
                   link_id: "lnk_5567"
@@ -396,7 +396,7 @@ paths:
               clickMinimal:
                 summary: Android minimal click (optional fields omitted entirely).
                 value:
-                  url: "https://godetour.dev/u/launch"
+                  url: "https://l.postedapp.com/u/launch"
                   timestamp: 1719158400000
                   platform: android
       responses:

@@ -139,7 +139,7 @@ class DeprecationShimsTest {
         runTest {
             server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/full-url"}"""))
 
-            val result = Posted.resolveShortLink("https://godetour.dev/xAb")
+            val result = Posted.resolveShortLink("https://l.postedapp.com/xAb")
 
             assertEquals("https://example.com/full-url", result?.link)
         }
@@ -149,7 +149,7 @@ class DeprecationShimsTest {
         runTest {
             server.enqueue(MockResponse().setResponseCode(404))
 
-            val result = Posted.resolveShortLink("https://godetour.dev/invalid")
+            val result = Posted.resolveShortLink("https://l.postedapp.com/invalid")
 
             assertNull(result)
         }
@@ -168,7 +168,7 @@ class DeprecationShimsTest {
             Posted.processLink(linkIntent("https://example.com/canon"))
             Posted.getDeferredLink()
             Posted.resolveInitialLink(linkIntent("https://example.com/canon2"))
-            Posted.resolveShortLink("https://godetour.dev/xAb")
+            Posted.resolveShortLink("https://l.postedapp.com/xAb")
 
             val logs = org.robolectric.shadows.ShadowLog.getLogs().mapNotNull { it.msg }
             val expected =
@@ -222,14 +222,14 @@ class DeprecationShimsTest {
             server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/full-url"}"""))
             org.robolectric.shadows.ShadowLog.clear()
 
-            Posted.resolveShortLink("https://godetour.dev/xAb")
-            Posted.resolveShortLink("https://godetour.dev/xAb")
+            Posted.resolveShortLink("https://l.postedapp.com/xAb")
+            Posted.resolveShortLink("https://l.postedapp.com/xAb")
             val countBeforeReset =
                 org.robolectric.shadows.ShadowLog.getLogs()
                     .count { it.msg?.contains("resolveShortLink() is deprecated") == true }
 
             Posted.resetDeprecationWarnings()
-            Posted.resolveShortLink("https://godetour.dev/xAb")
+            Posted.resolveShortLink("https://l.postedapp.com/xAb")
             val countAfterReset =
                 org.robolectric.shadows.ShadowLog.getLogs()
                     .count { it.msg?.contains("resolveShortLink() is deprecated") == true }
