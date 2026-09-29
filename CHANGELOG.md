@@ -5,13 +5,10 @@ All notable changes to posted-sdk for Android are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.0.0] — Unreleased (staged)
+## [4.0.0] — released
 
-First public release under the **Posted** brand.
-
-> **Staged release.** This entry is prepared ahead of publishing. The artifact is
-> **not** yet published to Maven Central and no git tag has been pushed — publishing
-> is gated on a separate board approval.
+First public release under the **Posted** brand. Published to Maven Central as
+`com.postedapp:posted-sdk:4.0.0`.
 
 ### Added
 - Canonical **`posted://`** custom URL scheme. Register it on your link-handling
@@ -55,4 +52,4 @@ First public release under the **Posted** brand.
   as deprecated shims (see **Deprecated**) rather than being dropped outright —
   hard removal is deferred to 4.0.
 
-[3.0.0]: https://github.com/thepostedapp/posted-sdk-android/releases/tag/v3.0.0
+[4.0.0]: https://github.com/thepostedapp/posted-sdk-android/releases/tag/v4.0.0
