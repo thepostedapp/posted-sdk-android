@@ -25,7 +25,6 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.Collections
@@ -61,7 +60,6 @@ object Posted {
 
     @Volatile
     private var isInitialized = false
-
 
     // Single-flight guard for first-launch resolution. Concurrent first callers share one
     // [resolveAndCache] so exactly one network resolve happens per launch (fire-once). The
@@ -509,5 +507,4 @@ object Posted {
             params = UrlHelpers.parseQueryParams(link),
         )
     }
-
 }
