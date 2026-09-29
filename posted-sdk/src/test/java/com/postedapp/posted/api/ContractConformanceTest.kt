@@ -143,7 +143,7 @@ class ContractConformanceTest {
     @Test
     fun `resolve-short sends url field conforming to contract`() {
         server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/app/product"}"""))
-        val shortUrl = "https://godetour.dev/x9Az"
+        val shortUrl = "https://l.postedapp.com/x9Az"
 
         runBlocking { apiClient.resolveShortLink(shortUrl) }
 
@@ -163,7 +163,7 @@ class ContractConformanceTest {
     @Test
     fun `universal-link-click minimal android shape omits params and conforms to contract`() {
         server.enqueue(MockResponse().setResponseCode(200).setBody("""{"allowed":true,"clickId":"clk_001"}"""))
-        val url = "https://godetour.dev/u/launch"
+        val url = "https://l.postedapp.com/u/launch"
 
         runBlocking { apiClient.sendUniversalLinkClick(url) }
 
