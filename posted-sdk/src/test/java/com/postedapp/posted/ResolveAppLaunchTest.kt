@@ -13,6 +13,7 @@ import com.postedapp.posted.test.InMemoryStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.Dispatcher
@@ -546,6 +547,79 @@ class ResolveAppLaunchTest {
             assertEquals(2, server.requestCount)
             assertTrue(results.first() is LinkResult.Success)
             results.forEach { assertEquals(results.first(), it) }
+        }
+
+    // ── First-awaiter cancellation vs in-flight resolution race (POS-349) ────
+
+    /**
+     * Hardens the single-flight guard against the cancellation race described in [POS-349]
+     * (Android mirror of iOS [POS-139]): the awaiter that CREATED the shared [Deferred] being
+     * cancelled must never clear `inFlight` while the shared `resolveScope`-backed resolve is
+     * still running — otherwise a caller racing in right after that cancellation would find
+     * `inFlight == null` and kick off a duplicate network resolve. Teardown must instead be
+     * driven by the shared deferred's own completion.
+     *
+     * Sequence: the creating awaiter starts the resolve and parks mid-network-call (gated
+     * response) → it is cancelled and its cancellation is allowed to fully settle while the
+     * response is still withheld → two more callers race in immediately after — they must join
+     * the still-running shared resolve rather than starting a second one → the gated response is
+     * released → both new callers observe the shared result, and exactly one network request was
+     * ever made.
+     */
+    @Test
+    fun `cancelling the awaiter that created the shared resolution does not re-arm a duplicate network call`() =
+        runBlocking {
+            val requestArrived = CountDownLatch(1)
+            val releaseResponse = CountDownLatch(1)
+            val requests = AtomicInteger(0)
+
+            server.dispatcher =
+                object : Dispatcher() {
+                    override fun dispatch(request: RecordedRequest): MockResponse {
+                        requests.incrementAndGet()
+                        requestArrived.countDown()
+                        releaseResponse.await()
+                        return MockResponse().setResponseCode(200)
+                            .setBody("""{"link":"https://example.com/app/shared"}""")
+                    }
+                }
+
+            // Creating awaiter: kicks off the shared resolve and parks mid-network-call.
+            val creator = async(Dispatchers.Default) { Posted.resolveAppLaunch(null) }
+            assertTrue(
+                "creating awaiter should reach the network before it is cancelled",
+                requestArrived.await(5, TimeUnit.SECONDS),
+            )
+
+            // Cancel the creator and wait for its cancellation to fully settle, while the shared
+            // resolve is still parked (gated) on the network response — this is the exact window
+            // the fix must close. The shared resolve itself runs on resolveScope, independent of
+            // the creator's own job, so it is unaffected by this cancellation.
+            creator.cancelAndJoin()
+
+            // Two more callers race in immediately after, while the response is still withheld.
+            // If `inFlight` was prematurely cleared by the cancelled creator, one of these would
+            // start a second network resolve (and fail below on a missing enqueued response).
+            val second = async(Dispatchers.Default) { Posted.resolveAppLaunch(null) }
+            val third = async(Dispatchers.Default) { Posted.resolveAppLaunch(null) }
+
+            releaseResponse.countDown()
+
+            val secondResult = second.await()
+            val thirdResult = third.await()
+
+            assertTrue(secondResult is LinkResult.Success)
+            assertEquals(
+                "https://example.com/app/shared",
+                (secondResult as LinkResult.Success).url,
+            )
+            assertEquals("remaining awaiters must observe the same shared result", secondResult, thirdResult)
+            assertEquals(
+                "only ONE network request should ever have been made — second/third must join " +
+                    "the shared in-flight resolve, not start their own",
+                1,
+                requests.get(),
+            )
         }
 
     // ── helpers ──────────────────────────────────────────────────────────────

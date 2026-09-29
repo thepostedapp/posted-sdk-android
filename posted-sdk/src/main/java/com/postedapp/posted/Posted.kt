@@ -25,6 +25,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.Collections
@@ -195,7 +196,28 @@ object Posted {
                         } else {
                             val epoch = resolveEpoch.get()
                             inFlightEpoch = epoch
-                            resolveScope.async { resolveAndCache(intent, epoch) }.also { inFlight = it } to epoch
+                            val newDeferred = resolveScope.async { resolveAndCache(intent, epoch) }
+                            inFlight = newDeferred
+                            // Teardown is driven by the shared deferred's OWN completion, not by
+                            // any individual awaiter's finally: a waiter racing a cancellation must
+                            // never clear inFlight while the shared resolve is still running (that
+                            // would re-arm a second concurrent network resolve). invokeOnCompletion
+                            // fires exactly once, regardless of how many/few callers ever awaited,
+                            // and is unaffected by a waiter's own cancellation since [newDeferred]
+                            // runs on [resolveScope], not the waiter's coroutine.
+                            newDeferred.invokeOnCompletion {
+                                resolveScope.launch {
+                                    resolveMutex.withLock {
+                                        // Gated on BOTH identity and epoch so a stale resolution
+                                        // settling after resetSession() can never clobber the fresh
+                                        // resolution's inFlight pointer.
+                                        if (inFlight === newDeferred && resolveEpoch.get() == epoch) {
+                                            inFlight = null
+                                        }
+                                    }
+                                }
+                            }
+                            newDeferred to epoch
                         }
                     }
                 }
@@ -203,19 +225,7 @@ object Posted {
             if (deferred == null) {
                 attributionCache.loadResult() ?: resolveAndCache(intent, deferredEpoch)
             } else {
-                try {
-                    deferred.await()
-                } finally {
-                    // Re-arm for a later reset/re-resolve, but only if no fresher (post-reset)
-                    // resolution has already replaced this pointer. Gated on BOTH identity and
-                    // epoch so a stale resolution settling after resetSession() can never clobber
-                    // the fresh resolution's inFlight pointer.
-                    resolveMutex.withLock {
-                        if (inFlight === deferred && resolveEpoch.get() == deferredEpoch) {
-                            inFlight = null
-                        }
-                    }
-                }
+                deferred.await()
             }
         } catch (e: Exception) {
             Log.e(TAG, "[Posted:RUNTIME_ERROR] Error in resolveAppLaunch", e)
