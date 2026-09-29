@@ -417,6 +417,3 @@ object PostedAnalytics {
 
 ---
 
-## License
-
-This library is licensed under [The MIT License](./LICENSE).
