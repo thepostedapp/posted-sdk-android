@@ -152,6 +152,18 @@ object Posted {
      *
      * Cache re-arms on app reinstall (OS clears storage) or explicit [resetSession].
      *
+     * Concurrent-caller intent capture: if multiple callers race [resolveAppLaunch] before the
+     * first resolution completes, they are single-flighted onto one shared resolution (see
+     * [resolveMutex]/[inFlight]) and only ONE [intent] is ever dispatched — the [intent] passed by
+     * whichever caller wins the race to create the in-flight resolution. Every other concurrent
+     * caller's [intent] argument is silently ignored for that resolution; those callers instead
+     * receive the winner's [LinkResult]. This is correct for Android first-launch (the launching
+     * Activity's intent is authoritative and callers racing it are typically passing the same or
+     * no intent), but it means a caller that races in with a link-carrying [intent] while another
+     * caller is already in flight with a different (or null) intent will NOT have its link
+     * processed by that resolution — only by a later call, once the fire-once cache/in-flight
+     * guard has cleared (e.g. via [resetSession]).
+     *
      * @param intent Activity intent ([Activity.getIntent] or [Activity.onNewIntent]).
      *               Pass null for deferred-only (background / cold-start without a link).
      * @return [LinkResult] — same shape as today; never throws.

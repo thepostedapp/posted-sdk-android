@@ -243,6 +243,44 @@ class ResolveAppLaunchTest {
             results.forEach { assertEquals(results.first(), it) }
         }
 
+    // ── Error propagation from a shared in-flight resolution (POS-345) ───────
+
+    /**
+     * When [resolveAndCache] throws inside the shared `resolveScope.async { }`, the [Deferred]
+     * completes exceptionally and every caller single-flighted onto it must observe that same
+     * exception as [LinkResult.Error] — not silently see a different/stale result. The `finally`
+     * clause that re-arms [Posted]'s `inFlight` pointer must run regardless of the exception, so a
+     * subsequent call is not permanently wedged and performs a fresh network resolve (retry).
+     */
+    @Test
+    fun `N concurrent callers all observe the same resolution error and inFlight re-arms for a later retry`() =
+        runTest {
+            // Only ONE error response is enqueued: if more than one resolve reached the network,
+            // a second concurrent call would throw (no response left) instead of joining the
+            // single in-flight resolution.
+            server.enqueue(MockResponse().setResponseCode(500).setBody("boom"))
+
+            val n = 20
+            val results =
+                (1..n).map {
+                    async { Posted.resolveAppLaunch(null) }
+                }.awaitAll()
+
+            assertEquals(1, server.requestCount)
+            results.forEach { assertTrue("every caller must see the resolution error", it is LinkResult.Error) }
+
+            // Fire-once cache must not be armed on error — the next call should re-resolve fully.
+            assertFalse(storage.getItem(StorageKeys.ATTRIBUTION_RESOLVED) == "true")
+
+            // inFlight must have been cleared (re-armed) by the finally block: a subsequent call
+            // makes a brand-new network request rather than joining a stale/dead Deferred.
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/app/retry"}"""))
+            val retry = Posted.resolveAppLaunch(null)
+            assertTrue(retry is LinkResult.Success)
+            assertEquals("https://example.com/app/retry", (retry as LinkResult.Success).url)
+            assertEquals(2, server.requestCount)
+        }
+
     // ── Storage-write-failure isolation (POS-501) ─────────────────────────────
 
     @Test
