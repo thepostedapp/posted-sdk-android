@@ -1,10 +1,10 @@
 package com.postedapp.posted.api
 
-import java.security.MessageDigest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.security.MessageDigest
 
 /**
  * Whole-file drift guard for the vendored SDK-backend contract (POS-578 / POS-283).
@@ -19,20 +19,21 @@ import org.junit.Test
  *   2. `shasum -a 256 posted-sdk/src/test/resources/fixtures/posted-backend-contract.yaml`
  *   3. update [CANONICAL_SHA256] below
  *   4. move the sibling pins in the same change (Flutter `test/contract_drift_test.dart`,
- *      React Native `__fixtures__`, iOS `ContractConformanceTests.swift`)
+ *      React Native `src/__tests__/contract-drift.test.ts`, iOS
+ *      `ContractFixtureChecksumTests.swift`)
  *
  * KNOWN LIMITATION: a pinned checksum detects this vendored copy being edited, but NOT the
  * canonical contract drifting ahead of it. That needs cross-repo read access in CI and is
  * deliberately out of scope.
  */
 class ContractFixtureChecksumTest {
-
     @Test
     fun `vendored contract matches the pinned canonical checksum`() {
         val bytes = readFixtureBytes()
-        val actual = MessageDigest.getInstance("SHA-256")
-            .digest(bytes)
-            .joinToString("") { "%02x".format(it) }
+        val actual =
+            MessageDigest.getInstance("SHA-256")
+                .digest(bytes)
+                .joinToString("") { "%02x".format(it) }
 
         assertEquals(
             "Vendored contract drifted from canonical. Re-vendor and update " +
