@@ -7,8 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.0.0] — Unreleased (staged)
 
-First public release under the **Posted** brand. This version supersedes the
-legacy **Detour** SDK; see [MIGRATION.md](./MIGRATION.md) for the upgrade path.
+First public release under the **Posted** brand.
 
 > **Staged release.** This entry is prepared ahead of publishing. The artifact is
 > **not** yet published to Maven Central and no git tag has been pushed — publishing
@@ -47,8 +46,6 @@ legacy **Detour** SDK; see [MIGRATION.md](./MIGRATION.md) for the upgrade path.
 - `getDeferredLink()` → use `resolveAppLaunch()`.
 - `resolveShortLink(url)` → internal use only now; use `resolveAppLaunch(intent)`
   for link resolution.
-- Legacy `Detour*` type aliases (`Detour`, `DetourConfig`, `DetourDelegate`,
-  `DetourStorage`, `DetourAnalytics`, `DetourEventNames`).
 - All of the above are retained for one migration cycle and will be **removed in
   the next major (4.0)**. Each carries a `ReplaceWith` for IDE-assisted migration.
 
@@ -57,9 +54,5 @@ legacy **Detour** SDK; see [MIGRATION.md](./MIGRATION.md) for the upgrade path.
   `getDeferredLink`, `resolveShortLink`, and `resolveInitialLink` remain callable
   as deprecated shims (see **Deprecated**) rather than being dropped outright —
   hard removal is deferred to 4.0.
-
-### Migration
-- `SharedPreferences` keys are migrated automatically from the `Detour_` prefix to
-  the `Posted_` prefix on first launch — no consumer action required.
 
 [3.0.0]: https://github.com/thepostedapp/posted-sdk-android/releases/tag/v3.0.0

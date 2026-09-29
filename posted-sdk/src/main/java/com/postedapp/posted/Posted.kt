@@ -25,7 +25,6 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.Collections
@@ -61,8 +60,6 @@ object Posted {
 
     @Volatile
     private var isInitialized = false
-
-    private val migrationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // Single-flight guard for first-launch resolution. Concurrent first callers share one
     // [resolveAndCache] so exactly one network resolve happens per launch (fire-once). The
@@ -134,9 +131,6 @@ object Posted {
         this.installReferrerHelper = InstallReferrerHelper(context.applicationContext)
         this.firstLaunchDetector = FirstLaunchDetector(this.storage)
         this.attributionCache = AttributionCache(this.storage)
-
-        // One-time migration of SharedPreferences keys from Detour_ prefix to Posted_ prefix
-        migrationScope.launch { migrateStorageKeysIfNeeded() }
 
         // Initialize analytics subsystem
         PostedAnalytics.initialize(config, this.storage)
@@ -512,23 +506,5 @@ object Posted {
             type = LinkType.DEFERRED,
             params = UrlHelpers.parseQueryParams(link),
         )
-    }
-
-    /**
-     * One-time migration of SharedPreferences keys from the old Detour_ prefix to the new Posted_ prefix.
-     * Read legacy key → write new key → delete legacy key (if legacy key exists).
-     */
-    private suspend fun migrateStorageKeysIfNeeded() {
-        val legacyFlag = storage.getItem("Detour_firstEntranceFlag")
-        if (legacyFlag != null) {
-            storage.setItem("Posted_firstEntranceFlag", legacyFlag)
-            storage.removeItem("Detour_firstEntranceFlag")
-        }
-
-        val legacyDeviceId = storage.getItem("Detour_deviceId")
-        if (legacyDeviceId != null) {
-            storage.setItem("Posted_deviceId", legacyDeviceId)
-            storage.removeItem("Detour_deviceId")
-        }
     }
 }

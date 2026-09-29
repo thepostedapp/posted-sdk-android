@@ -11,7 +11,7 @@ import java.io.File
  * that isn't mentioned anywhere in that README section, or if the README's fenced `kotlin` block
  * still lists a method Posted.kt no longer declares.
  *
- * Scoped to android-detour docs only; cross-platform README parity is tracked by POS-256.
+ * Scoped to posted-sdk (Android) docs only; cross-platform README parity is tracked by POS-256.
  */
 class PostedApiDocDriftGuardTest {
     @Test

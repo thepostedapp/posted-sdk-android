@@ -234,9 +234,9 @@ class ContractConformanceTest {
      *   `<semver>` = `\d+\.\d+\.\d+`.
      * - Platform token (exact): native iOS -> `ios`; native Android -> `android`;
      *   Flutter wrapper (both iOS-host and Android-host markers) -> `flutter`.
-     * - Backend dependency: the native dual-lookup (`PostedFlutterMarker` -> legacy
-     *   `DetourFlutterMarker`) reads this value verbatim; a token/format drift on any
-     *   platform silently mis-attributes installs. That is why this is pinned in CI.
+     * - Backend dependency: the native lookup (`PostedFlutterMarker`) reads this value
+     *   verbatim; a token/format drift on any platform silently mis-attributes installs.
+     *   That is why this is pinned in CI.
      */
     private val sdkHeaderContractRegex = Regex("^android/\\d+\\.\\d+\\.\\d+$")
 
