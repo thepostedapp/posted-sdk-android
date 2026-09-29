@@ -8,7 +8,7 @@ Add the SDK to your `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.postedapp:posted-sdk:3.0.0")
+    implementation("com.postedapp:posted-sdk:4.0.0")
 }
 ```
 
@@ -47,8 +47,8 @@ class MainActivity : AppCompatActivity() {
     private val postedDelegate = PostedDelegate(
         lifecycleOwner = this,
         config = PostedConfig(
-            appId = "<REPLACE_WITH_APP_ID_FROM_PLATFORM>",
-            apiKey = "<REPLACE_WITH_YOUR_API_KEY>"
+            appId = "<YOUR_APP_ID>",
+            apiKey = "<YOUR_API_KEY>"
         ),
         onLinkResult = { result -> handleLinkResult(result) }
     )
@@ -102,8 +102,8 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         val config = PostedConfig(
-            appId = "<REPLACE_WITH_APP_ID_FROM_PLATFORM>",
-            apiKey = "<REPLACE_WITH_YOUR_API_KEY>"
+            appId = "<YOUR_APP_ID>",
+            apiKey = "<YOUR_API_KEY>"
         )
         Posted.initialize(this, config)
 
@@ -132,8 +132,8 @@ Use `linkProcessingMode` to control which link sources the SDK handles:
 
 ```kotlin
 val config = PostedConfig(
-    appId = "<REPLACE_WITH_APP_ID_FROM_PLATFORM>",
-    apiKey = "<REPLACE_WITH_YOUR_API_KEY>",
+    appId = "<YOUR_APP_ID>",
+    apiKey = "<YOUR_API_KEY>",
     linkProcessingMode = LinkProcessingMode.WEB_ONLY
 )
 ```
@@ -224,8 +224,8 @@ class EncryptedStorageProvider(context: Context) : PostedStorage {
 }
 
 val config = PostedConfig(
-    appId = "<REPLACE_WITH_APP_ID_FROM_PLATFORM>",
-    apiKey = "<REPLACE_WITH_YOUR_API_KEY>",
+    appId = "<YOUR_APP_ID>",
+    apiKey = "<YOUR_API_KEY>",
     storage = EncryptedStorageProvider(this)
 )
 ```
