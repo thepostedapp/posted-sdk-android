@@ -18,13 +18,13 @@ import java.io.IOException
 /**
  * API client for posted-sdk link-matching and short-link resolution.
  *
- * NOTE: Backend URL (godetour.dev) is intentionally kept until B3 (new backend domain)
+ * NOTE: Backend API domain. Cut over from the legacy host to attr.postedapp.com (POS-336).
  * is confirmed live/redirecting by the board. See POS-39 prerequisites.
  */
 internal class PostedApiClient(
     private val config: PostedConfig,
     private val context: Context,
-    private val baseUrl: String = "https://godetour.dev",
+    private val baseUrl: String = "https://attr.postedapp.com",
 ) {
     /**
      * Match link using fingerprint data.

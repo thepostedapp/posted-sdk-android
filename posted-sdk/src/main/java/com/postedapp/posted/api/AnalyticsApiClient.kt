@@ -19,7 +19,7 @@ import java.util.TimeZone
  */
 internal class AnalyticsApiClient(
     private val config: PostedConfig,
-    private val baseUrl: String = "https://godetour.dev",
+    private val baseUrl: String = "https://attr.postedapp.com",
 ) {
     private val isoFormat =
         SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
