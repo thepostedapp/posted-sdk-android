@@ -6,7 +6,7 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
-version = "3.0.0"
+version = "4.0.0"
 val sdkVersion = project.version.toString()
 
 android {
