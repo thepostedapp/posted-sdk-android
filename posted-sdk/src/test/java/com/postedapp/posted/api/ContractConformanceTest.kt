@@ -16,7 +16,10 @@ import com.postedapp.posted.referrer.InstallReferrerHelper
 import com.postedapp.posted.storage.AttributionCache
 import com.postedapp.posted.storage.FirstLaunchDetector
 import com.postedapp.posted.test.InMemoryStorage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
@@ -59,6 +62,7 @@ class ContractConformanceTest {
     @After
     fun tearDown() {
         server.shutdown()
+        drainResolveScope()
         resetPostedSingleton()
     }
 
@@ -329,6 +333,26 @@ class ContractConformanceTest {
         referrerField.isAccessible = true
         referrerField.set(Posted, fake)
     }
+
+    /**
+     * Waits for any coroutine still running on [Posted]'s internal `resolveScope` — e.g. the
+     * inFlight-clearing cleanup that `invokeOnCompletion` fires (unawaited by any test) after a
+     * shared resolution settles — to finish before this test's fields are reset. Otherwise that
+     * leftover coroutine can still be touching `resolveMutex`/`inFlight` (or, if it were to run
+     * late enough, observe the NEXT test's freshly-swapped `storage`/`attributionCache`) after
+     * the reset below, leaking state across test boundaries and producing order-dependent
+     * flakiness (see POS-605).
+     */
+    private fun drainResolveScope() =
+        runBlocking {
+            val scopeField = Posted::class.java.getDeclaredField("resolveScope")
+            scopeField.isAccessible = true
+            val scope = scopeField.get(Posted) as CoroutineScope
+            withTimeoutOrNull(5_000) {
+                scope.coroutineContext[Job]?.children?.toList()?.forEach { it.join() }
+            }
+            Unit
+        }
 
     private fun resetPostedSingleton() {
         val isInitField = Posted::class.java.getDeclaredField("isInitialized")

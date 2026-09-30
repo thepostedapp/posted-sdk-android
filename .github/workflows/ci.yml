@@ -32,3 +32,5 @@ jobs:
         with: { packages: platform-tools }   # v3 defaults to 'tools platform-tools'; legacy 'tools' no longer resolves
       - uses: gradle/actions/setup-gradle@v4   # caches ~/.gradle deps + build cache; key auto-invalidates on gradle file changes
       - run: ./gradlew detekt assembleRelease lint testDebugUnitTest
+      - name: generate API reference (Dokka) — fails the build on generation error
+        run: ./gradlew dokkaHtml
