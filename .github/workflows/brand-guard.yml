@@ -1,0 +1,36 @@
+name: brand-guard
+
+# Fails if legacy product/vendor names reappear anywhere in the tree.
+#
+# WHY: these names were purged repo-wide, but new content keeps reintroducing
+# them — usually in good faith, by writing "do not use <legacy host>" in a doc
+# or a test assertion. That still ships the name. State the canonical hosts
+# positively instead (see COMPATIBILITY.md) and assert with an allowlist.
+#
+# The patterns below are written with a bracketed character class so this file
+# does not itself contain the literals it bans.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  brand-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan tree for legacy names
+        run: |
+          set -uo pipefail
+          PATTERN='[d]etour|[s]wmansion'
+          # Exclude .git and this workflow itself.
+          if grep -rInE "$PATTERN" . \
+               --exclude-dir=.git \
+               --exclude=brand-guard.yml > /tmp/hits.txt; then
+            echo "::error::Legacy product/vendor name found. Do not name the old"
+            echo "::error::host even to forbid it — assert an allowlist instead."
+            cat /tmp/hits.txt
+            exit 1
+          fi
+          echo "clean - no legacy names in tree"
