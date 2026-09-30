@@ -20,6 +20,7 @@ import com.postedapp.posted.storage.FirstLaunchDetector
 import com.postedapp.posted.storage.PostedStorage
 import com.postedapp.posted.utils.UrlHelpers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -70,11 +71,6 @@ object Posted {
     private val resolveScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val resolveMutex = Mutex()
     private var inFlight: Deferred<LinkResult>? = null
-
-    // Epoch the current [inFlight] resolution was created under; mutated only alongside
-    // [inFlight] under [resolveMutex]. Compared against [resolveEpoch] to detect a resolution
-    // that started before the most recent [resetSession] (mirrors iOS POS-267 / RN POS-154).
-    private var inFlightEpoch: Int = -1
 
     // Bumped synchronously by resetSession()/resetSessionAndAwait() before the deferred clear
     // happens. A resolution snapshots this epoch when it starts; if the epoch has since moved on
@@ -178,17 +174,23 @@ object Posted {
         }
 
         return try {
-            // Fast path: already resolved and no reset in progress → return cached.
+            // Fast path: already resolved and no reset in progress → return cached without ever
+            // touching resolveMutex. If the cache reports resolved but fails to actually load (a
+            // torn multi-key read from a non-atomic custom PostedStorage, or a resetSession
+            // landing between these two independent suspend calls), fall through to the guarded
+            // slow path below instead of firing a resolve here — every network resolve must go
+            // through the single-flight guard, never unguarded from the fast path.
             if (!clearPending && attributionCache.isResolved()) {
-                return attributionCache.loadResult() ?: resolveAndCache(intent, resolveEpoch.get())
+                attributionCache.loadResult()?.let { return it }
             }
 
-            // Slow path: single-flight the first resolution. Under the lock we double-check the
-            // cache (a peer may have resolved while we waited) and either join the in-flight
-            // resolve or start it. We await OUTSIDE the lock so waiters don't serialize on the
-            // network call. [deferredEpoch] is the epoch the joined/created resolution snapshotted
-            // at creation — used below to detect a stale (pre-reset) settle.
-            val (deferred, deferredEpoch) =
+            // Slow path: single-flight everything else. The "already resolved" check and its
+            // load are both repeated HERE, under the lock, so a resolved-but-unloadable cache can
+            // never slip past the guard the way it could when the load happened outside the lock:
+            // it now falls through to the join-or-create branch below instead of firing an
+            // unguarded resolve. We await the deferred OUTSIDE the lock so waiters don't
+            // serialize on the network call.
+            val deferred: Deferred<LinkResult> =
                 resolveMutex.withLock {
                     // Honor a pending reset first: clear exactly once under the lock so the
                     // re-resolve below observes an empty cache. Doing the clear here (instead of
@@ -199,15 +201,13 @@ object Posted {
                         inFlight = null
                         clearPending = false
                     }
-                    if (attributionCache.isResolved()) {
-                        null to resolveEpoch.get()
-                    } else {
-                        val existing = inFlight
-                        if (existing != null) {
-                            existing to inFlightEpoch
-                        } else {
+                    val cached = if (attributionCache.isResolved()) attributionCache.loadResult() else null
+                    val existing = inFlight
+                    when {
+                        cached != null -> CompletableDeferred(cached)
+                        existing != null -> existing
+                        else -> {
                             val epoch = resolveEpoch.get()
-                            inFlightEpoch = epoch
                             val newDeferred = resolveScope.async { resolveAndCache(intent, epoch) }
                             inFlight = newDeferred
                             // Teardown is driven by the shared deferred's OWN completion, not by
@@ -229,16 +229,12 @@ object Posted {
                                     }
                                 }
                             }
-                            newDeferred to epoch
+                            newDeferred
                         }
                     }
                 }
 
-            if (deferred == null) {
-                attributionCache.loadResult() ?: resolveAndCache(intent, deferredEpoch)
-            } else {
-                deferred.await()
-            }
+            deferred.await()
         } catch (e: Exception) {
             Log.e(TAG, "[Posted:RUNTIME_ERROR] Error in resolveAppLaunch", e)
             LinkResult.Error(e)

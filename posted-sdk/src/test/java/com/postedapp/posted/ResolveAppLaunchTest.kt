@@ -347,6 +347,49 @@ class ResolveAppLaunchTest {
             )
         }
 
+    // ── Resolved-but-unloadable cache vs single-flight guard (POS-623) ────────
+
+    /**
+     * Reproduces the bug that motivated [POS-623]: when [AttributionCache.isResolved] reports
+     * true but [AttributionCache.loadResult] returns null for that same read — a torn multi-key
+     * record, e.g. from a non-atomic custom [PostedStorage] that has committed the resolved
+     * flag/schema before the result blob — the old fast/slow-path fallback fired an UNGUARDED
+     * `resolveAndCache` directly, bypassing `resolveMutex`/`inFlight` entirely. Every one of N
+     * concurrent callers hitting that disagreement would independently reach the network. The
+     * fix folds the load into the single-flight decision itself (under the lock), so a
+     * resolved-but-unloadable cache always joins or creates exactly one guarded resolution.
+     */
+    @Test
+    fun `resolved-but-unloadable cache is repaired by exactly one guarded resolve, never an unguarded duplicate`() =
+        runBlocking {
+            // Prime a torn record directly: ATTRIBUTION_RESOLVED + current CACHE_SCHEMA_VERSION
+            // are present (isResolved() == true) but the result blob (URL) is missing
+            // (loadResult() == null) — exactly the disagreement the old fallback fired on.
+            storage.setItem(StorageKeys.ATTRIBUTION_RESOLVED, "true")
+            storage.setItem(StorageKeys.CACHE_SCHEMA_VERSION, AttributionCache.CURRENT_CACHE_SCHEMA.toString())
+            storage.setItem(StorageKeys.CACHED_RESULT_KIND, "success")
+
+            // Only ONE response is enqueued: if the guard were bypassed, more than one of the N
+            // concurrent callers would reach the network and this would fail on a missing response.
+            server.enqueue(MockResponse().setResponseCode(200).setBody("""{"link":"https://example.com/app/repaired"}"""))
+
+            val n = 20
+            val results =
+                (1..n).map {
+                    async(Dispatchers.Default) { Posted.resolveAppLaunch(null) }
+                }.awaitAll()
+
+            assertEquals(1, server.requestCount)
+            assertTrue(results.first() is LinkResult.Success)
+            results.forEach { assertEquals(results.first(), it) }
+
+            // The guarded resolve's saveResult() must have replaced the torn record with a
+            // complete, consistent one — the fire-once cache is now genuinely loadable.
+            val repaired = AttributionCache(storage).loadResult()
+            assertTrue(repaired is LinkResult.Success)
+            assertEquals("https://example.com/app/repaired", (repaired as LinkResult.Success).url)
+        }
+
     // ── Re-arm via resetSession ───────────────────────────────────────────────
 
     @Test
