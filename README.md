@@ -396,6 +396,15 @@ interface PostedStorage {
 
 ## API Reference
 
+Full KDoc reference is auto-generated from source via [Dokka](https://github.com/Kotlin/dokka) and cannot drift from the code. CI runs `./gradlew dokkaHtml` on every PR to `main` and fails the build if generation errors. Generate it locally with:
+
+```bash
+./gradlew :posted-sdk:dokkaHtml
+# output: posted-sdk/build/dokka/html/index.html
+```
+
+Hosting the generated reference publicly is tracked separately (POS-590); this repo builds and links it, it does not publish it.
+
 ### Posted
 
 <details>

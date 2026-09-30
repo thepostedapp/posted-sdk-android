@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.vanniktech.maven.publish)
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
+    alias(libs.plugins.dokka)
 }
 
 version = "4.0.0"
