@@ -1,0 +1,87 @@
+name: Publish
+
+# Publishes com.postedapp:posted-sdk to Maven Central on every version tag.
+#
+# Tag format is the bare version (`1.0.0`, no `v`), matching the other Posted SDKs. The tag must
+# equal `version` in posted-sdk/build.gradle.kts. Maven Central versions are permanent: a
+# published version can never be replaced, so bump the version for every release.
+#
+# Secrets: MAVEN_CENTRAL_USERNAME / MAVEN_CENTRAL_PASSWORD (a Central Portal user token) and
+# GPG_KEYS / GPG_KEYS_PASSWORD (the ASCII-armored signing key and its passphrase).
+
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Existing tag to publish (e.g. 1.0.0)"
+        required: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # creates the GitHub Release
+    concurrency:
+      group: publish-${{ github.ref }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.version.outputs.version }}
+
+      - name: Check build.gradle.kts version matches the tag
+        run: |
+          v="${{ steps.version.outputs.version }}"
+          gradle_v=$(sed -nE 's/^version = "([^"]+)".*/\1/p' posted-sdk/build.gradle.kts)
+          echo "tag=$v gradle=$gradle_v"
+          [ "$gradle_v" = "$v" ] || { echo "::error::posted-sdk/build.gradle.kts version $gradle_v != tag $v"; exit 1; }
+
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: android-actions/setup-android@v3
+        with: { packages: platform-tools }
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Skip if already on Maven Central
+        id: exists
+        run: |
+          v="${{ steps.version.outputs.version }}"
+          code=$(curl -s -o /dev/null -w '%{http_code}' "https://repo1.maven.org/maven2/com/postedapp/posted-sdk/$v/posted-sdk-$v.pom")
+          if [ "$code" = "200" ]; then
+            echo "posted-sdk $v is already on Maven Central; skipping publish"
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to Maven Central
+        if: steps.exists.outputs.published == 'false'
+        run: ./gradlew :posted-sdk:publishAndReleaseToMavenCentral --no-configuration-cache
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_KEYS }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_KEYS_PASSWORD }}
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${{ steps.version.outputs.version }}"
+          gh release view "$v" >/dev/null 2>&1 && exit 0
+          gh release create "$v" --title "$v" --notes "posted-sdk $v on Maven Central: \`implementation(\"com.postedapp:posted-sdk:$v\")\`. Central sync can take up to an hour after publish."

@@ -1,0 +1,11 @@
+build:
+  maxIssues: 0
+comments: { active: false }
+complexity: { active: false }
+naming: { active: false }
+style: { active: false }
+exceptions: { active: false }
+performance: { active: false }
+potential-bugs: { active: true }
+coroutines: { active: true }
+empty-blocks: { active: true }

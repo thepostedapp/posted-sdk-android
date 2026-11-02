@@ -1,0 +1,12 @@
+*.iml
+.gradle
+.gradle-local
+/local.properties
+local.properties
+examples/*/secrets.properties
+/.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
