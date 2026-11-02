@@ -1,103 +1,19 @@
-# posted-sdk for Android — Full Example
+# posted-sdk for Android — Example
 
-This example demonstrates a full integration of `com.postedapp:posted-sdk` using `PostedDelegate` and `LinkProcessingMode.ALL`.
+A minimal app that calls `Posted.reportInstall()` in `Application.onCreate()` and shows when the report for this launch has finished.
 
-## Scenario represented
+## Setup
 
-- `MainActivity`: uses `PostedDelegate` with `LinkProcessingMode.ALL` to handle Universal Links, custom scheme links (`posted-example-app://`), and deferred deep links automatically. Shows custom encrypted storage via `EncryptedStorageProvider`.
-- `ProductActivity`: navigated to from a `/products/{id}` route. Logs a `ViewItem` analytics event.
-- `PromoActivity`: navigated to from a `/promo` route. Logs a `Purchase` event and a `subscription_renewed` retention event.
+1. Create an app and an API key at [app.postedapp.com/dashboard/settings](https://app.postedapp.com/dashboard/settings) under **Posted SDK** (see the main README's [Get your app ID and API key](../../README.md#get-your-app-id-and-api-key)).
+2. Copy `secrets.properties.example` to `secrets.properties` in this folder and fill in the two values:
 
-## What this example covers
+   | Key              | Where to find it                                          |
+   | ---------------- | --------------------------------------------------------- |
+   | `POSTED_API_KEY` | Dashboard → Settings → Posted SDK → API keys → Create key |
+   | `POSTED_APP_ID`  | Dashboard → Settings → Posted SDK → Apps → Add app        |
 
-- SDK initialization and `PostedDelegate` lifecycle wiring (`onCreate` / `onNewIntent`).
-- All three `LinkProcessingMode` options (inline comments in `MainActivity` config).
-- Universal Links (`https://`) and custom scheme links (`posted-example-app://`) handled side by side.
-- Custom storage implementation (`EncryptedSharedPreferences`).
-- `LinkResult` handling: `Success` (with `route`, `pathname`, `params`, `type`), `NotFirstLaunch`, `NoLink`, `Error`.
-- Route-based navigation from link results.
-- Analytics:
-  - `MainActivity` — `PostedAnalytics.logEvent(ReEngage)` on every link-driven open, with `source` (`deferred` / `universal` / `scheme` from `LinkType.name`) and `route` properties.
-  - `ProductActivity` — `PostedAnalytics.logEvent(ViewItem)` with the product ID.
-  - `PromoActivity` — `PostedAnalytics.logEvent(Purchase)` and `PostedAnalytics.logRetention("subscription_renewed")`.
+3. Open the repository root in Android Studio, select the `examples.example` run configuration, and run it on a device or emulator.
 
-## Test flow
+## What to expect
 
-1) Start the app on a device or emulator.
-2) You land on `MainActivity` — status shows "No deep link detected".
-3) Trigger the App Link by opening the link on the device — Android will open the app directly if App Links are configured. Alternatively, use following command:
-   ```shell
-   adb shell am start -a android.intent.action.VIEW \
-     -d "https://<your-link-domain>/products/42" \
-     com.postedapp.posted.example
-   ```
-   - Status updates and app navigates to `ProductActivity`. Type shows `VERIFIED`.
-   - A `ReEngage` event with `source=verified` is logged. A `ViewItem` event is logged in `ProductActivity`.
-4) Trigger a custom scheme link:
-   ```shell
-   adb shell am start -a android.intent.action.VIEW \
-     -d "posted-example-app://products/42" \
-     com.postedapp.posted.example
-   ```
-   - Same navigation result but type shows `SCHEME`. A `ReEngage` event with `source=scheme` is logged.
-   The canonical `posted://` scheme is also registered and behaves identically:
-   ```shell
-   adb shell am start -a android.intent.action.VIEW \
-     -d "posted://products/42" \
-     com.postedapp.posted.example
-   ```
-5) For deferred link testing: uninstall the app, copy a posted-sdk link from the Dashboard, then install and launch — the deferred link should resolve on first open and a `ReEngage` event with `source=deferred` is logged.
-
-## Custom scheme links
-
-Two custom schemes are registered in `AndroidManifest.xml`: the app-specific `posted-example-app://` and the SDK's canonical `posted://` scheme:
-
-```xml
-<intent-filter>
-  <action android:name="android.intent.action.VIEW" />
-  <category android:name="android.intent.category.DEFAULT" />
-  <category android:name="android.intent.category.BROWSABLE" />
-  <data android:scheme="posted-example-app" />
-</intent-filter>
-<intent-filter>
-  <action android:name="android.intent.action.VIEW" />
-  <category android:name="android.intent.category.DEFAULT" />
-  <category android:name="android.intent.category.BROWSABLE" />
-  <data android:scheme="posted" />
-</intent-filter>
-```
-
-The SDK parses the URI as `/<host><path>` — so `posted-example-app://products/42` and `posted://products/42` both become route `/products/42`, identical to what a Universal Link would produce. Custom scheme links are only processed when `linkProcessingMode = ALL`.
-
-> `posted://` is the SDK's canonical scheme. Replace `posted-example-app` with your app's actual URI scheme; you can keep `posted://` registered alongside it. Custom scheme links do not require domain verification, making them useful for testing or internal tools.
-
-## Quick start
-
-1. Configure this app in the Posted Dashboard. You'll need two values:
-   - **Package name:** `com.postedapp.posted.example` (from `applicationId` in `build.gradle.kts`)
-   - **SHA256 certificate fingerprint** — run this to get it from your debug keystore:
-     ```shell
-     keytool -list -v \
-       -keystore ~/.android/debug.keystore \
-       -alias androiddebugkey \
-       -storepass android \
-       -keypass android \
-       | grep "SHA256"
-     ```
-     > The debug certificate is machine-specific — each developer must register their own fingerprint. For a release build, use your release keystore and its alias instead.
-
-2. Add your credentials from the Dashboard — either via a secrets file:
-   ```shell
-   cp secrets.properties.example secrets.properties
-   # then edit secrets.properties with your POSTED_API_KEY and POSTED_APP_ID
-   ```
-   or by hardcoding them directly in `MainActivity.kt`.
-
-3. Update the Universal Link `intent-filter` in `AndroidManifest.xml` with your app's verified link domain and path prefix from the Dashboard.
-
-4. Build and run:
-   ```shell
-   ./gradlew :examples:example:installDebug
-   ```
-
-5. Trigger test links: **deferred** — copy the link from the Posted Dashboard before a fresh install, then install and launch. **Universal Link** — open the link while the app is running or from cold start. **Custom scheme** — use the ADB command from the test flow above.
+On the first launch the SDK posts the install report. Filter Logcat by the `PostedApiClient` tag and look for `Install reported`. Later launches send nothing. Uninstall and run again to report a fresh install.

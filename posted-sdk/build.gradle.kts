@@ -7,7 +7,7 @@ plugins {
     alias(libs.plugins.dokka)
 }
 
-version = "4.0.0"
+version = "1.0.0"
 val sdkVersion = project.version.toString()
 
 android {
@@ -64,7 +64,6 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
     testImplementation("org.robolectric:robolectric:4.11.1")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
-    testImplementation("com.networknt:json-schema-validator:1.4.3")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }
@@ -75,7 +74,7 @@ mavenPublishing {
     signAllPublications()
     pom {
         name = "posted-sdk Android"
-        description = "SDK for handling deferred deep links on Android."
+        description = "Reports app installs to Posted for ad attribution. One call, reportInstall, sent once per install."
         url = "https://github.com/thepostedapp/posted-sdk-android"
         licenses {
             license {

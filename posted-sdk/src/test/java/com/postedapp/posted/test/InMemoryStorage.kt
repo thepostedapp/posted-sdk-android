@@ -17,14 +17,6 @@ class InMemoryStorage : PostedStorage {
         store[key] = value
     }
 
-    override suspend fun setItems(entries: Map<String, String>) {
-        store.putAll(entries)
-    }
-
-    override suspend fun removeItem(key: String) {
-        store.remove(key)
-    }
-
     fun clear() {
         store.clear()
     }

@@ -3,14 +3,10 @@ package com.postedapp.posted.models
 import com.google.gson.annotations.SerializedName
 
 /**
- * Base interface for device fingerprints used in link matching.
+ * The device signals the backend matches an install to the ad click that led to it.
+ * Field names are the wire format shared with the other platform SDKs: never rename them.
  */
-sealed interface DeviceFingerprint
-
-/**
- * Probabilistic device fingerprint for link matching.
- */
-data class ProbabilisticFingerprint(
+internal data class ProbabilisticFingerprint(
     @SerializedName("platform")
     val platform: String,
     @SerializedName("model")
@@ -33,30 +29,9 @@ data class ProbabilisticFingerprint(
     val userAgent: String?,
     @SerializedName("timestamp")
     val timestamp: Long,
-    @SerializedName("pastedLink")
-    val pastedLink: String? = null,
-) : DeviceFingerprint
-
-/**
- * Deterministic fingerprint using click ID from install referrer.
- */
-data class DeterministicFingerprint(
-    @SerializedName("clickId")
-    val clickId: String,
-) : DeviceFingerprint
-
-/**
- * Locale information.
- */
-data class LocaleInfo(
-    @SerializedName("languageTag")
-    val languageTag: String,
 )
 
-/**
- * API response from link matching endpoint.
- */
-data class LinkMatchResponse(
-    @SerializedName("link")
-    val link: String?,
+internal data class LocaleInfo(
+    @SerializedName("languageTag")
+    val languageTag: String,
 )

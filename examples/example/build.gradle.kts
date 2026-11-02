@@ -58,9 +58,6 @@ dependencies {
     // posted-sdk
     implementation(project(":posted-sdk"))
 
-    // Encrypted storage for custom storage example
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
-
     // Android dependencies
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)

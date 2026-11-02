@@ -18,33 +18,7 @@
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
-      <intent-filter>
-        <action android:name="android.intent.action.VIEW" />
-        <category android:name="android.intent.category.DEFAULT" />
-        <category android:name="android.intent.category.BROWSABLE" />
-        <data android:scheme="posted-example-app" />
-      </intent-filter>
-      <!-- Canonical posted:// scheme. Handled by posted-sdk alongside the
-           deterministic install-referrer flow; complements (does not replace) the
-           app-specific scheme above. -->
-      <intent-filter>
-        <action android:name="android.intent.action.VIEW" />
-        <category android:name="android.intent.category.DEFAULT" />
-        <category android:name="android.intent.category.BROWSABLE" />
-        <data android:scheme="posted" />
-      </intent-filter>
-      <!-- PASTE YOUR DASHBOARD LINK CONFIGURATION HERE -->
     </activity>
-
-    <activity
-      android:name="com.postedapp.posted.example.ProductActivity"
-      android:exported="false"
-      android:theme="@style/Theme.PostedAndroidSDK" />
-
-    <activity
-      android:name="com.postedapp.posted.example.PromoActivity"
-      android:exported="false"
-      android:theme="@style/Theme.PostedAndroidSDK" />
 
   </application>
 

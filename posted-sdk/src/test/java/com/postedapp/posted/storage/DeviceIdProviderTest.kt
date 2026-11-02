@@ -1,6 +1,5 @@
-package com.postedapp.posted.analytics
+package com.postedapp.posted.storage
 
-import com.postedapp.posted.storage.StorageKeys
 import com.postedapp.posted.test.InMemoryStorage
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals

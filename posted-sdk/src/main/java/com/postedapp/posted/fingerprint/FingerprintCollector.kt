@@ -13,16 +13,11 @@ import java.util.Locale
 import java.util.TimeZone
 
 /**
- * Collects device fingerprint data for link matching.
+ * Collects the device signals sent with the install report.
+ *
+ * The clipboard is never read: it shows a system toast and install matching doesn't use it.
  */
 internal class FingerprintCollector(private val context: Context) {
-    /**
-     * Collect probabilistic device fingerprint.
-     *
-     * Note: clipboard is not read on Android — it triggers a system toast notification
-     * and is restricted to foreground apps. Deferred matching relies on IP, device model,
-     * screen dimensions, timezone, and language instead.
-     */
     suspend fun collectFingerprint(): ProbabilisticFingerprint =
         withContext(Dispatchers.IO) {
             val (width, height, density) = getScreenMetrics()
@@ -41,7 +36,6 @@ internal class FingerprintCollector(private val context: Context) {
                 timezone = timezone.id,
                 userAgent = getUserAgent(),
                 timestamp = System.currentTimeMillis(),
-                pastedLink = null,
             )
         }
 
@@ -69,6 +63,7 @@ internal class FingerprintCollector(private val context: Context) {
         )
     }
 
+    @Suppress("TooGenericExceptionCaught")
     private fun getUserAgent(): String? {
         return try {
             System.getProperty("http.agent")

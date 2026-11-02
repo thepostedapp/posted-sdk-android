@@ -22,4 +22,3 @@ dependencyResolutionManagement {
 rootProject.name = "com.postedapp.posted"
 include(":posted-sdk")
 include(":examples:example")
-include(":examples:example-deferred-only")

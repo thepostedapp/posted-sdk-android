@@ -1,16 +1,20 @@
 package com.postedapp.posted.example
 
 import android.app.Application
+import com.postedapp.posted.Posted
+import com.postedapp.posted.PostedConfig
 
-/**
- * Application class for posted-sdk example.
- *
- * Note: SDK initialization is handled in MainActivity using PostedDelegate.
- */
 class PostedExampleApp : Application() {
-
     override fun onCreate() {
         super.onCreate()
-        // Posted SDK is initialized in MainActivity with PostedDelegate
+        // Report the install on every launch. The SDK sends it once per install and retries on
+        // later launches until the backend accepts it. Returns immediately.
+        Posted.reportInstall(
+            this,
+            PostedConfig(
+                apiKey = BuildConfig.POSTED_API_KEY,
+                appId = BuildConfig.POSTED_APP_ID,
+            ),
+        )
     }
 }

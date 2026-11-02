@@ -13,24 +13,18 @@ class DefaultStorageProviderTest {
     private val provider = DefaultStorageProvider(RuntimeEnvironment.getApplication())
 
     @Test
-    fun `removeItems removes all specified keys and leaves others intact - POS-346`() =
+    fun `getItem returns null for an unknown key`() =
         runTest {
-            provider.setItems(mapOf("a" to "1", "b" to "2", "c" to "3"))
-
-            provider.removeItems(setOf("a", "b"))
-
-            assertNull(provider.getItem("a"))
-            assertNull(provider.getItem("b"))
-            assertEquals("3", provider.getItem("c"))
+            assertNull(provider.getItem("missing"))
         }
 
     @Test
-    fun `removeItems on empty set is a no-op`() =
+    fun `setItem persists and getItem reads it back`() =
         runTest {
             provider.setItem("a", "1")
-
-            provider.removeItems(emptySet())
-
             assertEquals("1", provider.getItem("a"))
+
+            provider.setItem("a", "2")
+            assertEquals("2", provider.getItem("a"))
         }
 }
