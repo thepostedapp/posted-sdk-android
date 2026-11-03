@@ -45,6 +45,8 @@ Or with a version catalog, in `gradle/libs.versions.toml`:
 posted-sdk = { module = "com.postedapp:posted-sdk", version = "1.0.0" }
 ```
 
+Always pin the version. Older `3.0.0` and `4.0.0` artifacts with a different API remain on Maven Central and still count as the "latest" release there, so a dynamic version (`+`, `latest.release`) resolves to them instead of 1.0.0.
+
 The SDK declares the `INTERNET` permission itself. No other setup is needed.
 
 ## 2. Report the install
