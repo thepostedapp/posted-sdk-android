@@ -1,0 +1,7 @@
+<resources>
+  <string name="app_name">Posted Example</string>
+  <string name="title">posted-sdk Example</string>
+  <string name="status_reporting">Reporting install…</string>
+  <string name="status_done">Install report finished. See Logcat (tag PostedApiClient) for the result.</string>
+  <string name="hint">The install is reported once. Uninstall and reinstall the app to report again.</string>
+</resources>
