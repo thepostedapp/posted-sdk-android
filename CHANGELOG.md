@@ -2,6 +2,16 @@
 
 All notable changes to `com.postedapp:posted-sdk` are documented here.
 
+## [4.0.2]
+
+### Added
+
+- The install report includes `installSource`: `store` for an App Store or
+  Google Play install, `development` for debug, TestFlight, ad hoc, emulator and
+  Expo Go builds. It's read by a small native module bundled with the SDK, so
+  update and rebuild the native app; no new dependencies. If the module isn't
+  linked (e.g. new JS over the air on an older binary), the field is omitted.
+
 ## [4.0.1] — Initial public release
 
 Initial public release of `com.postedapp:posted-sdk` for Android.

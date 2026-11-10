@@ -29,6 +29,9 @@ internal data class InstallContext(
     val userAgent: String?,
     @SerializedName("timestamp")
     val timestamp: Long,
+    /** `store` when Google Play installed this build, `development` otherwise; null if unreadable. */
+    @SerializedName("installSource")
+    val installSource: String?,
 )
 
 internal data class LocaleInfo(

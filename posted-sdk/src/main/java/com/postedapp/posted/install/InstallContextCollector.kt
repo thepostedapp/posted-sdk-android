@@ -1,6 +1,7 @@
 package com.postedapp.posted.install
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.content.res.Resources
 import android.os.Build
 import android.util.DisplayMetrics
@@ -36,6 +37,7 @@ internal class InstallContextCollector(private val context: Context) {
                 timezone = timezone.id,
                 userAgent = getUserAgent(),
                 timestamp = System.currentTimeMillis(),
+                installSource = getInstallSource(),
             )
         }
 
@@ -61,6 +63,23 @@ internal class InstallContextCollector(private val context: Context) {
             (dm.heightPixels / dm.density).toInt(),
             dm.density,
         )
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun getInstallSource(): String? {
+        if (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) return "development"
+        val installer =
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName
+                } else {
+                    @Suppress("DEPRECATION")
+                    context.packageManager.getInstallerPackageName(context.packageName)
+                }
+            } catch (_: Exception) {
+                return null
+            }
+        return if (installer == "com.android.vending") "store" else "development"
     }
 
     @Suppress("TooGenericExceptionCaught")
