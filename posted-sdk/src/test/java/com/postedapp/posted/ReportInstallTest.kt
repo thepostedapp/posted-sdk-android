@@ -7,8 +7,10 @@ package com.postedapp.posted
 //   4. The flag is armed only on a 2xx, so failures retry on the next launch
 //   5. Concurrent calls share one request
 //   6. Blank credentials send nothing
+//   7. installSource: store when Google Play installed the build, development otherwise
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import com.google.gson.JsonParser
 import com.postedapp.posted.api.PostedApiClient
 import com.postedapp.posted.referrer.InstallReferrerHelper
@@ -31,6 +33,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 class ReportInstallTest {
@@ -106,6 +110,49 @@ class ReportInstallTest {
 
             val json = body(server.takeRequest())
             assertEquals("0192f1e2-aaaa-7bbb-8ccc-dddddddddddd", json["clickId"].asString)
+        }
+
+    private fun installedBy(installer: String?) {
+        context.applicationInfo.flags = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE.inv()
+        shadowOf(context.packageManager).setInstallSourceInfo(context.packageName, installer, installer)
+    }
+
+    // Robolectric 4.11 can't build InstallSourceInfo on SDK 34.
+    @Test
+    @Config(sdk = [30])
+    fun `sends store as the install source for a Google Play install`() =
+        runBlocking {
+            server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
+            installedBy("com.android.vending")
+
+            report()
+
+            assertEquals("store", body(server.takeRequest())["installSource"].asString)
+        }
+
+    @Test
+    @Config(sdk = [30])
+    fun `sends development as the install source for a sideloaded build`() =
+        runBlocking {
+            server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
+            installedBy(null)
+
+            report()
+
+            assertEquals("development", body(server.takeRequest())["installSource"].asString)
+        }
+
+    @Test
+    @Config(sdk = [30])
+    fun `sends development as the install source for a debuggable build`() =
+        runBlocking {
+            server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
+            installedBy("com.android.vending")
+            context.applicationInfo.flags = context.applicationInfo.flags or ApplicationInfo.FLAG_DEBUGGABLE
+
+            report()
+
+            assertEquals("development", body(server.takeRequest())["installSource"].asString)
         }
 
     @Test
