@@ -5,8 +5,8 @@ package com.postedapp.posted.storage
  * to replace the default `SharedPreferences` store, for example with MMKV, DataStore or
  * EncryptedSharedPreferences.
  *
- * The SDK stores two keys, both prefixed with `Posted_`: the "install reported" flag and a device
- * ID. If storage is cleared, the install is reported again.
+ * The SDK stores three keys, all prefixed with `Posted_`: the "install reported" flag, the
+ * "RevenueCat user reported" flag and a device ID. If storage is cleared, the install is reported again.
  */
 interface PostedStorage {
     /** Returns the stored value for [key], or null if there is none. */

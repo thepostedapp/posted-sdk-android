@@ -10,6 +10,7 @@ import com.postedapp.posted.storage.DefaultStorageProvider
 import com.postedapp.posted.storage.DeviceIdProvider
 import com.postedapp.posted.storage.PostedStorage
 import com.postedapp.posted.storage.StorageKeys
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -40,6 +41,7 @@ object Posted {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val mutex = Mutex()
     private var inFlight: Deferred<Unit>? = null
+    private val revenueCatMutex = Mutex()
 
     /**
      * Reports this install for ad attribution.
@@ -96,6 +98,71 @@ object Posted {
                 }
             }
         deferred.await()
+    }
+
+    /**
+     * Links the RevenueCat app user id to this install, so purchases can be attributed.
+     *
+     * Call it after `Purchases.configure(...)`. The id is sent once per install, and retried on
+     * later calls until the backend accepts it. Never throws and never blocks the caller.
+     */
+    @JvmStatic
+    fun setRevenueCatUserId(
+        context: Context,
+        config: PostedConfig,
+        id: String,
+    ) {
+        val appContext = context.applicationContext
+        scope.launch { setRevenueCatUserIdAndAwait(appContext, config, id) }
+    }
+
+    /**
+     * Suspending variant of [setRevenueCatUserId] that completes when the id has been sent (or has
+     * failed for this call). Never throws.
+     */
+    @JvmStatic
+    suspend fun setRevenueCatUserIdAndAwait(
+        context: Context,
+        config: PostedConfig,
+        id: String,
+    ) {
+        setRevenueCatUserIdAndAwait(
+            context.applicationContext,
+            config,
+            id,
+            PostedApiClient(config),
+            InstallReferrerHelper(context.applicationContext),
+        )
+    }
+
+    @VisibleForTesting
+    @Suppress("TooGenericExceptionCaught")
+    internal suspend fun setRevenueCatUserIdAndAwait(
+        context: Context,
+        config: PostedConfig,
+        id: String,
+        apiClient: PostedApiClient,
+        installReferrerHelper: InstallReferrerHelper,
+    ) {
+        try {
+            if (id.isEmpty()) return
+            val storage: PostedStorage = config.storage ?: DefaultStorageProvider(context)
+            // Concurrent callers queue here; the later ones find the flag set and send nothing.
+            revenueCatMutex.withLock {
+                if (storage.getItem(StorageKeys.REVENUECAT_USER_REPORTED) == "true") return
+                // The backend links the id to an existing install, so the install goes first.
+                reportInstallAndAwait(context, config, apiClient, installReferrerHelper)
+                if (storage.getItem(StorageKeys.INSTALL_REPORTED) != "true") return
+
+                if (apiClient.reportRevenueCatUser(DeviceIdProvider(storage).getDeviceId(), id)) {
+                    storage.setItem(StorageKeys.REVENUECAT_USER_REPORTED, "true")
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "[Posted:REVENUECAT_ERROR] Error reporting RevenueCat user", e)
+        }
     }
 
     @Suppress("TooGenericExceptionCaught")
