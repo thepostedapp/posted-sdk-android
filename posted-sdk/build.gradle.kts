@@ -7,7 +7,7 @@ plugins {
     alias(libs.plugins.dokka)
 }
 
-version = "4.0.2"
+version = "4.1.0"
 val sdkVersion = project.version.toString()
 
 android {

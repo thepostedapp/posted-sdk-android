@@ -1,6 +1,7 @@
 package com.postedapp.posted.api
 
 import android.util.Log
+import com.google.gson.JsonObject
 import com.postedapp.posted.FlutterSdkHeaderResolver
 import com.postedapp.posted.PostedConfig
 import com.postedapp.posted.models.InstallContext
@@ -56,6 +57,45 @@ internal class PostedApiClient(
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "[Posted:INSTALL_ERROR] Error reporting install", e)
+                false
+            }
+        }
+
+    /**
+     * POSTs the RevenueCat app user id for this install. Returns true only on a 2xx. Never throws.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    suspend fun reportRevenueCatUser(
+        deviceId: String,
+        revenueCatUserId: String,
+    ): Boolean =
+        withContext(Dispatchers.IO) {
+            try {
+                val body = JsonObject()
+                body.addProperty("device_id", deviceId)
+                body.addProperty("rc_user_id", revenueCatUserId)
+
+                val request =
+                    Request.Builder()
+                        .url("$baseUrl/api/revenueCatUser")
+                        .post(HttpClient.gson.toJson(body).toRequestBody(HttpClient.JSON))
+                        .addHeader("Content-Type", "application/json")
+                        .addHeader("Authorization", "Bearer ${config.apiKey}")
+                        .addHeader("X-App-ID", config.appId)
+                        .addHeader("X-SDK", FlutterSdkHeaderResolver.sdkHeaderValue)
+                        .build()
+
+                HttpClient.okHttp.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        Log.d(TAG, "RevenueCat user reported")
+                        true
+                    } else {
+                        Log.w(TAG, "[Posted:REVENUECAT_ERROR] Failed to report RevenueCat user: ${response.code}")
+                        false
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "[Posted:REVENUECAT_ERROR] Error reporting RevenueCat user", e)
                 false
             }
         }
