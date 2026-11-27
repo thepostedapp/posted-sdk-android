@@ -6,5 +6,5 @@ package com.postedapp.posted.storage
 internal object StorageKeys {
     const val DEVICE_ID = "Posted_deviceId"
     const val INSTALL_REPORTED = "Posted_installReported"
-    const val REVENUECAT_USER_REPORTED = "Posted_revenueCatUserReported"
+    const val PURCHASES_USER_REPORTED = "Posted_revenueCatUserReported"
 }

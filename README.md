@@ -11,7 +11,7 @@ The SDK reports installs only. It does not report purchases, signups or other in
 - [1. Install](#1-install)
 - [2. Report the install](#2-report-the-install)
 - [3. Verify the integration](#3-verify-the-integration)
-- [RevenueCat](#revenuecat)
+- [Purchases](#purchases)
 - [Configuration](#configuration)
 - [Privacy](#privacy)
 - [Troubleshooting](#troubleshooting)
@@ -37,7 +37,7 @@ The SDK is on Maven Central. In your app module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.postedapp:posted-sdk:4.1.0")
+    implementation("com.postedapp:posted-sdk:4.1.1")
 }
 ```
 
@@ -45,7 +45,7 @@ Or with a version catalog, in `gradle/libs.versions.toml`:
 
 ```toml
 [libraries]
-posted-sdk = { module = "com.postedapp:posted-sdk", version = "4.1.0" }
+posted-sdk = { module = "com.postedapp:posted-sdk", version = "4.1.1" }
 ```
 
 Always pin the version. Older `3.0.0` and `4.0.0` artifacts with a different API remain on Maven Central; use `4.0.1` or newer.
@@ -88,17 +88,19 @@ It returns immediately and runs in the background. It never throws, and it doesn
 2. Run the app with a **fresh install**. Uninstalling clears the SDK's storage, so a reinstall reports again.
 3. Watch Logcat, filtered by the `PostedApiClient` tag. On success you'll see `Install reported`. On failure, a line starting with `[Posted:INSTALL_ERROR]` (see [Troubleshooting](#troubleshooting)).
 
-## RevenueCat
+## Purchases
 
-If your app uses RevenueCat, pass its app user ID to Posted after `Purchases.configure(...)`. Posted uses it to attribute purchases to your campaigns.
+If your app sells through RevenueCat or Superwall, pass its user ID to Posted after the purchases SDK is configured. Posted uses it to attribute purchases to your campaigns.
 
 ```kotlin
 Purchases.configure(PurchasesConfiguration.Builder(this, "<REVENUECAT_API_KEY>").build())
 
-Posted.setRevenueCatUserId(this, config, Purchases.sharedInstance.appUserID)
+Posted.setPurchasesUserId(this, config, Purchases.sharedInstance.appUserID)
 ```
 
-Call it on every launch. The ID is sent once per install. It returns immediately and never throws; the suspending variant is `Posted.setRevenueCatUserIdAndAwait(context, config, id)`.
+With Superwall, pass `Superwall.instance.userId` instead.
+
+Call it on every launch. The ID is sent once per install. It returns immediately and never throws; the suspending variant is `Posted.setPurchasesUserIdAndAwait(context, config, id)`.
 
 ## Configuration
 
@@ -123,7 +125,7 @@ interface PostedStorage {
 }
 ```
 
-The SDK stores three keys, all prefixed with `Posted_`: the "install reported" flag, the "RevenueCat user reported" flag and a device ID. If storage is cleared, the install is reported again.
+The SDK stores three keys, all prefixed with `Posted_`: the "install reported" flag, the "Purchases user reported" flag and a device ID. If storage is cleared, the install is reported again.
 
 
 ## Privacy
