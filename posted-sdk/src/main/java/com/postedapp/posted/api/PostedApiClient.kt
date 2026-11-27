@@ -62,22 +62,22 @@ internal class PostedApiClient(
         }
 
     /**
-     * POSTs the RevenueCat app user id for this install. Returns true only on a 2xx. Never throws.
+     * POSTs the purchases user id for this install. Returns true only on a 2xx. Never throws.
      */
     @Suppress("TooGenericExceptionCaught")
-    suspend fun reportRevenueCatUser(
+    suspend fun reportPurchasesUser(
         deviceId: String,
-        revenueCatUserId: String,
+        purchasesUserId: String,
     ): Boolean =
         withContext(Dispatchers.IO) {
             try {
                 val body = JsonObject()
                 body.addProperty("device_id", deviceId)
-                body.addProperty("rc_user_id", revenueCatUserId)
+                body.addProperty("purchases_user_id", purchasesUserId)
 
                 val request =
                     Request.Builder()
-                        .url("$baseUrl/api/revenueCatUser")
+                        .url("$baseUrl/api/purchasesUser")
                         .post(HttpClient.gson.toJson(body).toRequestBody(HttpClient.JSON))
                         .addHeader("Content-Type", "application/json")
                         .addHeader("Authorization", "Bearer ${config.apiKey}")
@@ -87,15 +87,15 @@ internal class PostedApiClient(
 
                 HttpClient.okHttp.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
-                        Log.d(TAG, "RevenueCat user reported")
+                        Log.d(TAG, "Purchases user reported")
                         true
                     } else {
-                        Log.w(TAG, "[Posted:REVENUECAT_ERROR] Failed to report RevenueCat user: ${response.code}")
+                        Log.w(TAG, "[Posted:PURCHASES_ERROR] Failed to report purchases user: ${response.code}")
                         false
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "[Posted:REVENUECAT_ERROR] Error reporting RevenueCat user", e)
+                Log.e(TAG, "[Posted:PURCHASES_ERROR] Error reporting purchases user", e)
                 false
             }
         }

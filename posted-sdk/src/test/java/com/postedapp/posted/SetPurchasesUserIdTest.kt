@@ -1,7 +1,7 @@
 package com.postedapp.posted
 
-// Tests for the RevenueCat user link (POST /api/revenueCatUser):
-//   1. POST /api/revenueCatUser with SDK auth, the install's device_id and rc_user_id, then the flag is armed
+// Tests for the purchases user link (POST /api/purchasesUser):
+//   1. POST /api/purchasesUser with SDK auth, the install's device_id and purchases_user_id, then the flag is armed
 //   2. The install is reported first; nothing is sent while it stays unreported
 //   3. Sent once: nothing is sent once the flag is armed
 //   4. The flag is armed only on a 2xx, so failures retry on the next call
@@ -32,7 +32,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
 @RunWith(RobolectricTestRunner::class)
-class SetRevenueCatUserIdTest {
+class SetPurchasesUserIdTest {
     private lateinit var server: MockWebServer
     private lateinit var storage: InMemoryStorage
     private lateinit var context: Context
@@ -53,7 +53,7 @@ class SetRevenueCatUserIdTest {
     }
 
     private suspend fun setUserId(id: String = "rc-user-1") =
-        Posted.setRevenueCatUserIdAndAwait(
+        Posted.setPurchasesUserIdAndAwait(
             context,
             config,
             id,
@@ -65,10 +65,10 @@ class SetRevenueCatUserIdTest {
 
     private fun body(request: RecordedRequest) = JsonParser.parseString(request.body.readUtf8()).asJsonObject
 
-    private suspend fun isReported() = storage.getItem(StorageKeys.REVENUECAT_USER_REPORTED) == "true"
+    private suspend fun isReported() = storage.getItem(StorageKeys.PURCHASES_USER_REPORTED) == "true"
 
     @Test
-    fun `reports the install then posts device_id and rc_user_id with SDK auth and arms the flag`() =
+    fun `reports the install then posts device_id and purchases_user_id with SDK auth and arms the flag`() =
         runBlocking {
             server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
             server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
@@ -80,7 +80,7 @@ class SetRevenueCatUserIdTest {
 
             val request = server.takeRequest()
             assertEquals("POST", request.method)
-            assertEquals("/api/revenueCatUser", request.path)
+            assertEquals("/api/purchasesUser", request.path)
             assertEquals("Bearer test-api-key", request.getHeader("Authorization"))
             assertEquals("com.test.app", request.getHeader("X-App-ID"))
             assertEquals(install.getHeader("X-SDK"), request.getHeader("X-SDK"))
@@ -88,8 +88,8 @@ class SetRevenueCatUserIdTest {
             assertTrue(request.getHeader("Content-Type")!!.startsWith("application/json"))
 
             val json = body(request)
-            assertEquals(setOf("device_id", "rc_user_id"), json.keySet())
-            assertEquals("rc-user-1", json["rc_user_id"].asString)
+            assertEquals(setOf("device_id", "purchases_user_id"), json.keySet())
+            assertEquals("rc-user-1", json["purchases_user_id"].asString)
             assertEquals(body(install)["device_id"].asString, json["device_id"].asString)
             assertTrue(isReported())
         }
@@ -103,7 +103,7 @@ class SetRevenueCatUserIdTest {
             setUserId()
 
             assertEquals(1, server.requestCount)
-            assertEquals("/api/revenueCatUser", server.takeRequest().path)
+            assertEquals("/api/purchasesUser", server.takeRequest().path)
             assertTrue(isReported())
         }
 
@@ -122,7 +122,7 @@ class SetRevenueCatUserIdTest {
     @Test
     fun `sends nothing once reported`() =
         runBlocking {
-            storage.setItem(StorageKeys.REVENUECAT_USER_REPORTED, "true")
+            storage.setItem(StorageKeys.PURCHASES_USER_REPORTED, "true")
 
             setUserId()
 
